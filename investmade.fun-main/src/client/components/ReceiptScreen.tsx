@@ -56,8 +56,11 @@ export function ReceiptScreen({
 	const successfulLegs = record.settledOutputs.filter(
 		(output) => output.status === "success",
 	).length;
-	const chainLabel =
-		record.plan.chain === "SOLANA" ? "Solana" : "Robinhood Chain";
+	const chainLabel = demoMode
+		? "Stellar"
+		: record.plan.chain === "SOLANA"
+			? "Solana"
+			: "Robinhood Chain";
 	const providerLabel = executionProviderLabel(record.plan.provider);
 	const receiptStatus = receiptCopy(
 		record.status,
@@ -74,7 +77,8 @@ export function ReceiptScreen({
 	const transactionHash = record.transactionHashes.at(-1);
 	const isPending = record.status === "SUBMITTED";
 	const isSettled = record.status === "SETTLED";
-	const stableToken = record.plan.chain === "SOLANA" ? "USDC" : "USDG";
+	const stableToken =
+		demoMode || record.plan.chain === "SOLANA" ? "USDC" : "USDG";
 	const totalInput = formatUsd(
 		formatUnits(BigInt(record.plan.totalInputBaseUnits), 6),
 	);
@@ -280,8 +284,8 @@ export function ReceiptScreen({
 							{demoMode
 								? "This receipt is local demo evidence. It is not mainnet settlement proof."
 								: record.submissionMode === "BATCH"
-									? `Live settlement is verified from the atomic ${chainLabel} operation and output-token transfers to your Investmade Wallet.`
-									: `Live settlement is verified per ${chainLabel} transaction and output-token transfer to your Investmade Wallet.`}
+									? `Live settlement is verified from the atomic ${chainLabel} operation and output-token transfers to your Swyft Wallet.`
+									: `Live settlement is verified per ${chainLabel} transaction and output-token transfer to your Swyft Wallet.`}
 						</div>
 					</div>
 				</details>
@@ -424,8 +428,8 @@ function receiptCopy(
 			title: "Basket submitted",
 			description:
 				submissionMode === "BATCH"
-					? `Your Investmade Wallet broadcast one atomic operation. Waiting for ${chainLabel} settlement.`
-					: `Your Investmade Wallet broadcast independent swaps. Waiting for ${chainLabel} settlement.`,
+					? `Your Swyft Wallet broadcast one atomic operation. Waiting for ${chainLabel} settlement.`
+					: `Your Swyft Wallet broadcast independent swaps. Waiting for ${chainLabel} settlement.`,
 		};
 	}
 	if (status === "SETTLED") {

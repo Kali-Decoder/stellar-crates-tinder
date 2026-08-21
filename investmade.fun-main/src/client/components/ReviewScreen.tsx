@@ -366,7 +366,7 @@ export function ReviewScreen({
 			!wallet ||
 			!selected.length
 		) {
-			setError("No Investmade Wallet or executable calls are available.");
+			setError("No Swyft Wallet or executable calls are available.");
 			return;
 		}
 		if (
@@ -440,7 +440,7 @@ export function ReviewScreen({
 		}
 		if (!smartWalletReady) {
 			setError(
-				"Activate your Investmade smart wallet before signing. External wallets can fund it, but cannot execute an atomic basket.",
+				"Activate your Swyft smart wallet before signing. External wallets can fund it, but cannot execute an atomic basket.",
 			);
 			return;
 		}
@@ -692,7 +692,7 @@ export function ReviewScreen({
 								? perLegSolana
 									? "Independent Solana swaps"
 									: "Atomic Solana transaction"
-								: "Atomic Investmade Wallet"
+								: "Atomic Swyft Wallet"
 							: liveExecution
 								? "Live execution"
 								: "Demo execution",
@@ -816,7 +816,7 @@ export function ReviewScreen({
 							{loading
 								? "Refreshing…"
 								: errorCode === "INSUFFICIENT_SMART_WALLET_USDG"
-									? "Top up Investmade Wallet"
+									? "Top up Swyft Wallet"
 									: "Refresh quotes"}{" "}
 							{loading ? (
 								<LoaderCircle className="button-spinner" />
@@ -920,7 +920,7 @@ function executionErrorMessage(caught: unknown) {
 			caught.message,
 		)
 	) {
-		return "The atomic basket could not pass smart-wallet preflight. Check Investmade Wallet funding and the Robinhood Chain bundler configuration, then retry.";
+		return "The atomic basket could not pass smart-wallet preflight. Check Swyft Wallet funding and the Robinhood Chain bundler configuration, then retry.";
 	}
 	return caught instanceof Error ? caught.message : "Wallet execution failed.";
 }

@@ -20,7 +20,12 @@ import "@fontsource/instrument-serif/400.css";
 import instrumentSerifRegularUrl from "@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2?url";
 import { App } from "./App";
 import { api, type PublicConfig } from "./api";
+import { isMockUi } from "./mock/enabled";
+import { MockApp } from "./mock/MockApp";
+import { applyStoredTheme } from "./theme";
 import "./styles.css";
+
+applyStoredTheme();
 
 preload(instrumentSerifRegularUrl, {
   as: "font",
@@ -43,7 +48,7 @@ const robinhoodChain = defineChain({
   }
 });
 
-function Root() {
+function LiveRoot() {
   const [config, setConfig] = useState<PublicConfig>();
   const [error, setError] = useState("");
 
@@ -56,10 +61,10 @@ function Root() {
   }, []);
 
   if (error) {
-    return <main className="fatal-state"><h1>invest4.fun is unavailable</h1><p>{error}</p></main>;
+    return <main className="fatal-state"><h1>swyft.fun is unavailable</h1><p>{error}</p></main>;
   }
   if (!config) {
-    return <main className="loading-state"><span /><h1>Loading invest4.fun</h1></main>;
+    return <main className="loading-state"><span /><h1>Loading swyft.fun</h1></main>;
   }
 
   return (
@@ -112,6 +117,11 @@ function Root() {
       </SmartWalletsProvider>
     </PrivyProvider>
   );
+}
+
+function Root() {
+  if (isMockUi()) return <MockApp />;
+  return <LiveRoot />;
 }
 
 const root = document.getElementById("root");

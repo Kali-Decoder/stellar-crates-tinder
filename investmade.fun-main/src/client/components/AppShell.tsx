@@ -1,7 +1,9 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ConnectedWallet } from "@privy-io/react-auth";
 import type { ConnectedStandardSolanaWallet } from "@privy-io/react-auth/solana";
 import { Wallet } from "lucide-react";
+import { shortStellarAddress } from "../stellar/kit";
+import { ThemeToggle } from "./ThemeToggle";
 import { WalletMenu } from "./WalletMenu";
 
 interface Props {
@@ -11,8 +13,12 @@ interface Props {
 	fundingWallet?: ConnectedWallet;
 	topUpRequest?: number;
 	onWallet?: () => void;
+	onDisconnect?: () => void;
 	walletReady?: boolean;
+	walletConnecting?: boolean;
 	navigationEnabled?: boolean;
+	/** Skip Privy wallet menu; show Stellar / preview address controls. */
+	mockMode?: boolean;
 	activeChain: "ROBINHOOD" | "SOLANA";
 	onChainChange: (chain: "ROBINHOOD" | "SOLANA") => void;
 	solanaWallets: ConnectedStandardSolanaWallet[];
@@ -30,8 +36,11 @@ export function AppShell({
 	fundingWallet,
 	topUpRequest,
 	onWallet,
+	onDisconnect,
 	walletReady = true,
+	walletConnecting = false,
 	navigationEnabled = true,
+	mockMode = false,
 	activeChain,
 	onChainChange,
 	solanaWallets,
@@ -48,11 +57,15 @@ export function AppShell({
 		);
 		const previousChain = root.dataset.chain;
 		const previousThemeColor = themeColor?.content;
-		const chain = activeChain.toLowerCase();
+		const chain = mockMode ? "stellar" : activeChain.toLowerCase();
 
 		root.dataset.chain = chain;
 		if (themeColor) {
-			themeColor.content = activeChain === "SOLANA" ? "#090B0F" : "#f1f3f6";
+			const isDark = root.dataset.theme === "dark";
+			themeColor.content =
+				isDark || (!mockMode && activeChain === "SOLANA")
+					? "#0b0e14"
+					: "#f1f3f6";
 		}
 
 		return () => {
@@ -60,7 +73,7 @@ export function AppShell({
 			else delete root.dataset.chain;
 			if (themeColor && previousThemeColor) themeColor.content = previousThemeColor;
 		};
-	}, [activeChain]);
+	}, [activeChain, mockMode]);
 
 	return (
 		<div className="app-shell">
@@ -69,9 +82,9 @@ export function AppShell({
 					type="button"
 					className="brand"
 					onClick={() => onNavigate("week")}
-					aria-label="invest4.fun home"
+					aria-label="swyft.fun home"
 				>
-					invest4.<span>fun</span>
+					swyft.<span>fun</span>
 				</button>
 				{navigationEnabled ? (
 					<nav aria-label="Primary navigation">
@@ -92,36 +105,109 @@ export function AppShell({
 						))}
 					</nav>
 				) : null}
-				{wallet ? (
-					<div className="wallet-pill">
-						<WalletMenu
-							wallet={wallet}
-							fundingWallet={fundingWallet}
-							topUpRequest={topUpRequest}
-							activeChain={activeChain}
-							onChainChange={onChainChange}
-							solanaWallets={solanaWallets}
-							solanaWalletsReady={solanaWalletsReady}
-							solanaAvailable={solanaAvailable}
-							selectedSolanaWallet={selectedSolanaWallet}
-							onSolanaWalletChange={onSolanaWalletChange}
-						/>
-					</div>
-				) : (
-					<button
-						type="button"
-						className="wallet-button"
-						onClick={onWallet}
-						disabled={!walletReady}
-						aria-label="Connect wallet with Privy"
-						title="Connect wallet with Privy"
-					>
+				<div className="topbar-end">
+					<ThemeToggle />
+					{wallet ? (
+						<div className="wallet-pill">
+							{mockMode ? (
+								<StellarConnectedPill
+									address={wallet}
+									onDisconnect={onDisconnect}
+								/>
+							) : (
+								<WalletMenu
+									wallet={wallet}
+									fundingWallet={fundingWallet}
+									topUpRequest={topUpRequest}
+									activeChain={activeChain}
+									onChainChange={onChainChange}
+									solanaWallets={solanaWallets}
+									solanaWalletsReady={solanaWalletsReady}
+									solanaAvailable={solanaAvailable}
+									selectedSolanaWallet={selectedSolanaWallet}
+									onSolanaWalletChange={onSolanaWalletChange}
+								/>
+							)}
+						</div>
+					) : (
+						<button
+							type="button"
+							className="wallet-button"
+							onClick={onWallet}
+							disabled={!walletReady || walletConnecting}
+							aria-label="Connect Stellar wallet"
+							title="Connect Stellar wallet"
+						>
 						<Wallet size={17} strokeWidth={1.7} />
-						Connect wallet
+						{walletConnecting ? (
+							"Connecting…"
+						) : (
+							<>
+								<span className="wallet-label-full">Connect Stellar wallet</span>
+								<span className="wallet-label-short">Connect</span>
+							</>
+						)}
 					</button>
-				)}
+					)}
+				</div>
 			</header>
 			{children}
+		</div>
+	);
+}
+
+function StellarConnectedPill({
+	address,
+	onDisconnect,
+}: {
+	address: string;
+	onDisconnect?: () => void;
+}) {
+	const [open, setOpen] = useState(false);
+	const rootRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!open) return;
+		function onPointerDown(event: MouseEvent) {
+			if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+		}
+		window.addEventListener("mousedown", onPointerDown);
+		return () => window.removeEventListener("mousedown", onPointerDown);
+	}, [open]);
+
+	return (
+		<div ref={rootRef}>
+			<button
+				type="button"
+				className="wallet-menu-trigger"
+				aria-expanded={open}
+				aria-haspopup="menu"
+				onClick={() => setOpen((value) => !value)}
+			>
+				<Wallet size={17} strokeWidth={1.7} />
+				{shortStellarAddress(address)}
+			</button>
+			{open ? (
+				<div className="wallet-menu-content" role="menu">
+					<div className="wallet-menu-heading">
+		<span>Stellar wallet</span>
+						<strong>{shortStellarAddress(address)}</strong>
+					</div>
+					{onDisconnect ? (
+						<button
+							type="button"
+							className="wallet-menu-action danger"
+							role="menuitem"
+							onClick={() => {
+								setOpen(false);
+								onDisconnect();
+							}}
+						>
+							Log out
+						</button>
+					) : null}
+				</div>
+			) : null}
 		</div>
 	);
 }

@@ -314,7 +314,7 @@ export function WalletMenu({
             collisionPadding={12}
           >
             <div className="wallet-menu-heading">
-              <span>{activeChain === "SOLANA" ? "Solana wallet" : "Investmade Wallet"}</span>
+              <span>{activeChain === "SOLANA" ? "Solana wallet" : "Swyft Wallet"}</span>
               <strong>{shortAddress(wallet)}</strong>
             </div>
             <fieldset className="wallet-chain-selector" aria-label="Active chain">
@@ -451,12 +451,12 @@ export function WalletMenu({
                     <span className="account-label">Robinhood Chain · 4663</span>
                     <Dialog.Title>
                       {transferMode === "topUp"
-                        ? "Top up Investmade Wallet"
-                        : "Send from Investmade Wallet"}
+                        ? "Top up Swyft Wallet"
+                        : "Send from Swyft Wallet"}
                     </Dialog.Title>
                     <Dialog.Description>
                       {transferMode === "topUp"
-                        ? "Move tokens from your connected wallet to your Investmade Wallet."
+                        ? "Move tokens from your connected wallet to your Swyft Wallet."
                         : "Review the details, then confirm once in Privy."}
                     </Dialog.Description>
                   </div>
@@ -521,7 +521,7 @@ export function WalletMenu({
                 <label className="send-field">
                   <span>
                     {transferMode === "topUp"
-                      ? "Recipient · Investmade Wallet"
+                      ? "Recipient · Swyft Wallet"
                       : "Recipient address"}
                   </span>
                   <input
@@ -673,7 +673,7 @@ function sendErrorMessage(caught: unknown) {
   if (/reject|denied|cancel/i.test(message)) return "Transaction cancelled in Privy.";
   if (/insufficient|balance/i.test(message)) return "The wallet does not have enough funds.";
   if (/paymaster|bundler|user operation|smart wallet/i.test(message)) {
-    return "The Investmade Wallet could not prepare this transfer. Check Robinhood Chain smart-wallet settings.";
+    return "The Swyft Wallet could not prepare this transfer. Check Robinhood Chain smart-wallet settings.";
   }
   return message || "The transfer could not be submitted.";
 }

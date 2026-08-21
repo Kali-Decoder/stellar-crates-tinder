@@ -12,12 +12,14 @@ export function BudgetSummary({
 	ticketSizeUsd,
 	periodLimitUsd,
 	activeChain,
+	stableToken,
 	className = "",
 }: {
 	selectedCount: number;
 	ticketSizeUsd: number;
 	periodLimitUsd: number;
 	activeChain: AppChain;
+	stableToken?: "USDC" | "USDG";
 	className?: string;
 }) {
 	const remaining = Math.max(
@@ -26,12 +28,13 @@ export function BudgetSummary({
 	);
 	const remainingPercent =
 		periodLimitUsd > 0 ? (remaining / periodLimitUsd) * 100 : 0;
+	const token = stableToken ?? (activeChain === "SOLANA" ? "USDC" : "USDG");
 
 	return (
 		<div className={`rail-budget${className ? ` ${className}` : ""}`}>
 			<span>
 				This month limit: <strong>{formatTicketSizeUsd(remaining)}</strong>{" "}
-				{activeChain === "SOLANA" ? "USDC" : "USDG"} left
+				{token} left
 			</span>
 			<span
 				className="rail-budget-progress"
@@ -54,6 +57,9 @@ export function BudgetRail({
 	periodLimitUsd,
 	executionProvider,
 	activeChain,
+	stableToken,
+	networkLabel,
+	quoteLabel,
 }: {
 	selected: Candidate[];
 	onRemove: (assetId: string) => void;
@@ -61,7 +67,21 @@ export function BudgetRail({
 	periodLimitUsd: number;
 	executionProvider: ExecutionProviderId;
 	activeChain: AppChain;
+	stableToken?: "USDC" | "USDG";
+	networkLabel?: string;
+	quoteLabel?: string;
 }) {
+	const token = stableToken ?? (activeChain === "SOLANA" ? "USDC" : "USDG");
+	const network =
+		networkLabel ?? (activeChain === "SOLANA" ? "Solana" : "Robinhood");
+	const quotes =
+		quoteLabel ??
+		(executionProvider === "ZERO_EX"
+			? "0x"
+			: executionProvider === "JUPITER"
+				? "Jupiter"
+				: "Uniswap");
+
 	return (
 		<aside className="budget-rail" aria-label="Basket and providers">
 			<BudgetSummary
@@ -69,19 +89,14 @@ export function BudgetRail({
 				ticketSizeUsd={ticketSizeUsd}
 				periodLimitUsd={periodLimitUsd}
 				activeChain={activeChain}
+				stableToken={token}
 			/>
 			<div className="budget-meta">
 				<span className="quote-provider">
-					Quotes execution: <i aria-hidden="true" />{" "}
-					{executionProvider === "ZERO_EX"
-						? "0x"
-						: executionProvider === "JUPITER"
-							? "Jupiter"
-							: "Uniswap"}
+					Quotes execution: <i aria-hidden="true" /> {quotes}
 				</span>
 				<span className="network-line">
-					Chain: <i aria-hidden="true" />{" "}
-					{activeChain === "SOLANA" ? "Solana" : "Robinhood"}
+					Chain: <i aria-hidden="true" /> {network}
 				</span>
 			</div>
 			{selected.length ? (
@@ -104,7 +119,7 @@ export function BudgetRail({
 								</span>
 								<span className="basket-amount">
 									<strong>{formatTicketSizeUsd(ticketSizeUsd)}</strong>
-									<small>{activeChain === "SOLANA" ? "USDC" : "USDG"}</small>
+									<small>{token}</small>
 								</span>
 								<button
 									type="button"

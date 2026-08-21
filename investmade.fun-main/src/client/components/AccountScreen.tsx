@@ -217,7 +217,7 @@ export function AccountScreen({
 								aria-label={
 									addressCopied === "smart"
 										? "Address copied"
-										: "Copy Investmade Wallet address"
+										: "Copy Swyft Wallet address"
 								}
 								title={addressCopied === "smart" ? "Copied" : "Copy address"}
 								onClick={() => void copyAddress(wallet, "smart")}
@@ -253,7 +253,7 @@ export function AccountScreen({
 								<span className="account-label">Solana wallet</span>
 								<Dialog.Title>Top up USDC</Dialog.Title>
 								<Dialog.Description>
-									Send USDC on Solana to your Investmade Wallet.
+									Send USDC on Solana to your Swyft Wallet.
 								</Dialog.Description>
 							</div>
 							<Dialog.Close asChild>
@@ -307,7 +307,7 @@ export function AccountScreen({
 							<ShieldCheck aria-hidden="true" />
 						</span>
 						<div className="account-row-copy">
-							<strong>Investmade Wallet</strong>
+							<strong>Swyft Wallet</strong>
 							<div className="wallet-role-address">
 								<code>{wallet ? shortAddress(wallet) : "Not activated"}</code>
 								{wallet ? (
@@ -317,7 +317,7 @@ export function AccountScreen({
 										aria-label={
 											addressCopied === "smart"
 												? "Address copied"
-												: "Copy Investmade Wallet address"
+												: "Copy Swyft Wallet address"
 										}
 										onClick={() => void copyAddress(wallet, "smart")}
 									>
@@ -676,7 +676,7 @@ export function AccountScreen({
 							<div className="account-settings account-settings-form">
 								<fieldset className="settings-field execution-provider-setting">
 									<legend>Execution provider</legend>
-									<p>Choose where Investmade finds and executes your swaps.</p>
+									<p>Choose where Swyft finds and executes your swaps.</p>
 									<div className="execution-provider-options">
 										{draft.activeChain === "SOLANA" ? (
 											([

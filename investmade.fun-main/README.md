@@ -1,8 +1,10 @@
-# invest4.fun
+# swyft.fun
 
-invest4.fun is a non-custodial, fixed-budget allocation app for Robinhood Chain and Solana. A user selects a chain, sets a daily, weekly, or monthly spending limit, chooses the USDG or USDC amount represented by each decision, receives a ranked asset feed, builds a basket, and explicitly signs the complete basket.
+swyft.fun is a non-custodial, fixed-budget swipe allocation app built on **Stellar only**. Set a spending limit, swipe RWAs and crypto, build a basket, and approve with your Stellar wallet.
 
-The current product is user-controlled. It does not hold funds, run an autonomous mandate, or let an AI sign transactions. The backend ranks, prepares, and validates. A Privy ERC-4337 smart wallet signs Robinhood operations; the selected Privy-connected Solana wallet signs Solana transactions.
+Default `npm run dev` runs the Stellar mock UI (landing → wallet → plan → swipe). Robinhood / Solana live paths remain in the repo for reference but are not part of the default product surface.
+
+The original research brief remains in [investmade_fun.md](./investmade_fun.md).
 
 ## Current status
 
@@ -56,11 +58,19 @@ See [docs/USER_FLOW.md](./docs/USER_FLOW.md) for screen states, recovery paths, 
 
 ```bash
 npm ci --cache .npm-cache
-cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5173`. The default `.env.example` configuration is demo mode and never broadcasts.
+Open `http://localhost:5173`. By default this runs the **UI-only fixture flow** (no Privy / API server). **Connect wallet** uses `@creit.tech/stellar-wallets-kit` (same pattern as `swarp`) with the Investmade acid/light modal theme. Install Freighter (or another supported Stellar wallet) to connect on Testnet.
+
+To run the full live/demo stack with Privy + API (requires a configured `.env`):
+
+```bash
+cp .env.example .env   # if present
+npm run dev:live
+```
+
+Or open the UI-only app with `?live=1` after configuring Privy when using `dev:live`.
 
 Run the project checks:
 

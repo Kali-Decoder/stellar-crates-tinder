@@ -295,7 +295,7 @@ export function Onboarding({
 			const message = caught instanceof Error ? caught.message : "";
 			setError(
 				/smart wallet|configured|bundler|chain/i.test(message)
-					? "Investmade Wallet is not configured for Robinhood Chain yet. Enable chain 4663 in Privy Smart Wallet settings."
+					? "Swyft Wallet is not configured for Robinhood Chain yet. Enable chain 4663 in Privy Smart Wallet settings."
 					: message || "Privy wallet activation failed.",
 			);
 		} finally {
@@ -422,7 +422,7 @@ export function Onboarding({
 					<>
 						<Shield />
 						<span className="onboarding-kicker">Plan saved</span>
-						<h2>Activate your Investmade Wallet</h2>
+						<h2>Activate your Swyft Wallet</h2>
 						<p>
 							{config.demoMode
 								? "Real Privy wallet · simulated basket"
@@ -454,9 +454,9 @@ export function Onboarding({
 								: authenticated
 									? embeddedWallet
 										? smartWalletClient
-											? "Investmade Wallet ready"
-											: "Activate Investmade Wallet"
-										: "Create Investmade Wallet"
+											? "Swyft Wallet ready"
+											: "Activate Swyft Wallet"
+										: "Create Swyft Wallet"
 									: `Continue with ${
 											draft.activeChain === "SOLANA" ? "Solana" : "Robinhood"
 										}`}{" "}

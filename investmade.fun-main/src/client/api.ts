@@ -303,7 +303,7 @@ function apiErrorMessage(code: string) {
 	return "The basket could not be prepared. Please try again.";
 }
 
-export const api = {
+const liveApi = {
 	config: () => request<PublicConfig>("/api/config"),
 	preferences: () => request<OnboardingPreferences>("/api/preferences"),
 	savePreferences: (preferences: OnboardingPreferences) =>
@@ -430,3 +430,19 @@ export const api = {
 			status: "PENDING" | "FAILED" | "SETTLED";
 		}>(`/api/positions/${encodeURIComponent(assetId)}/exit/status`),
 };
+
+let apiOverride: typeof liveApi | undefined;
+
+/** Used by the mock UI entry to swap in fixture handlers without Privy/chain. */
+export function installApiOverride(override: typeof liveApi | undefined) {
+	apiOverride = override;
+}
+
+/** Live HTTP API, or an override installed by mock UI. */
+export const api: typeof liveApi = new Proxy(liveApi, {
+	get(_target, property, receiver) {
+		const resolved = apiOverride ?? liveApi;
+		const value = Reflect.get(resolved, property, receiver);
+		return typeof value === "function" ? value.bind(resolved) : value;
+	},
+});
