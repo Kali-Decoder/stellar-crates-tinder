@@ -8,7 +8,7 @@ use soroban_sdk::{
     contract, contractimpl,
     token::{Client as TokenClient, StellarAssetClient},
     testutils::{Address as _, Ledger},
-    vec, Address, Env, String, Vec,
+    vec, Address, Env, String,
 };
 
 // ---- mocks ----
@@ -31,31 +31,6 @@ impl MockOracle {
     }
 }
 
-/// Pulls `path[0]` from the recipient (`to`, which the vault sets to itself),
-/// sends 1:1 raw units of `path[1]`. Must be pre-funded with inventory.
-#[contract]
-pub struct MockRouter;
-
-#[contractimpl]
-impl MockRouter {
-    pub fn swap_exact_tokens_for_tokens(
-        e: &Env,
-        amount_in: i128,
-        amount_out_min: i128,
-        path: Vec<Address>,
-        to: Address,
-        _deadline: u64,
-    ) -> Vec<i128> {
-        assert!(amount_out_min <= amount_in, "mock router: min out exceeded");
-        let sell = path.get(0).unwrap();
-        let buy = path.get(1).unwrap();
-        let me = e.current_contract_address();
-        TokenClient::new(e, &sell).transfer_from(&me.clone(), &to.clone(), &me, &amount_in);
-        TokenClient::new(e, &buy).transfer(&me, &to, &amount_in);
-        vec![&e, amount_in, amount_in]
-    }
-}
-
 fn key(e: &Env, s: &str) -> String {
     String::from_str(e, s)
 }
@@ -64,6 +39,7 @@ const TS: u64 = 1_000_000;
 
 struct Setup {
     env: Env,
+    admin: Address,
     vault_addr: Address,
     usdc: Address,
     aapl: Address,
@@ -87,7 +63,6 @@ fn setup() -> Setup {
     let aapl = env.register_stellar_asset_contract_v2(admin.clone()).address();
     let nvda = env.register_stellar_asset_contract_v2(admin.clone()).address();
     let oracle = env.register(MockOracle, ());
-    let router = env.register(MockRouter, ());
 
     let vault_addr = env.register(BucketVault, ());
     let vault = BucketVaultClient::new(&env, &vault_addr);
@@ -96,21 +71,27 @@ fn setup() -> Setup {
         &usdc,
         &key(&env, "USDC/USD"),
         &oracle,
-        &router,
         &300,
         &500,
     );
 
-    // Fund mock router with stock inventory for buy legs.
-    StellarAssetClient::new(&env, &aapl).mint(&router, &(10_000_000_000_000));
-    StellarAssetClient::new(&env, &nvda).mint(&router, &(10_000_000_000_000));
-
+    // Seed vault pools at DIA prices: AAPL $2 (200k USDC / 100k AAPL),
+    // NVDA $1 (100k / 100k). Deep reserves keep rebalance slippage tiny.
     let oc = MockOracleClient::new(&env, &oracle);
     oc.set(&key(&env, "USDC/USD"), &100_000_000u128, &TS); // $1
     oc.set(&key(&env, "AAPL/USD"), &200_000_000u128, &TS); // $2
     oc.set(&key(&env, "NVDA/USD"), &100_000_000u128, &TS); // $1
 
-    Setup { env, vault_addr, usdc, aapl, nvda }
+    StellarAssetClient::new(&env, &usdc).mint(&admin, &3_000_000_000_000i128);
+    StellarAssetClient::new(&env, &aapl).mint(&admin, &1_000_000_000_000i128);
+    StellarAssetClient::new(&env, &nvda).mint(&admin, &1_000_000_000_000i128);
+    TokenClient::new(&env, &usdc).approve(&admin, &vault_addr, &3_000_000_000_000i128, &1000);
+    TokenClient::new(&env, &aapl).approve(&admin, &vault_addr, &1_000_000_000_000i128, &1000);
+    TokenClient::new(&env, &nvda).approve(&admin, &vault_addr, &1_000_000_000_000i128, &1000);
+    vault.seed_pool(&aapl, &2_000_000_000_000i128, &1_000_000_000_000i128);
+    vault.seed_pool(&nvda, &1_000_000_000_000i128, &1_000_000_000_000i128);
+
+    Setup { env, admin, vault_addr, usdc, aapl, nvda }
 }
 
 fn make_bucket(s: &Setup) -> u32 {
@@ -154,23 +135,26 @@ fn deposit_shares_nav_rebalance() {
 
     assert_eq!(s.vault().portfolio_value(&id), 8_000_000_000i128);
 
-    // Keeper rebalance toward 60/40. Expected buys priced off DIA:
+    // Keeper rebalance toward 60/40. Buys priced off DIA:
     // AAPL $48 -> 480e6 raw usdc in; NVDA $32 -> 320e6 raw usdc in.
-    // Mock router returns 1:1 units; min_outs set just under that.
+    // Pool math (200k/100k reserves) delivers ~239.9m / ~319.9m raw.
     s.vault().rebalance(
         &id,
         &(TS + 3600),
         &50,
-        &vec![&s.env, 479_999_999i128, 319_999_999i128],
+        &vec![&s.env, 230_000_000i128, 300_000_000i128],
     );
 
     let h = s.vault().holdings(&id);
     assert_eq!(h.get(s.usdc.clone()).unwrap_or(0), 0);
-    assert_eq!(h.get(s.aapl.clone()).unwrap_or(0), 480_000_000i128);
-    assert_eq!(h.get(s.nvda.clone()).unwrap_or(0), 320_000_000i128);
+    let aapl_out = h.get(s.aapl.clone()).unwrap_or(0);
+    let nvda_out = h.get(s.nvda.clone()).unwrap_or(0);
+    assert!(aapl_out > 235_000_000 && aapl_out < 245_000_000, "aapl {aapl_out}");
+    assert!(nvda_out > 315_000_000 && nvda_out < 325_000_000, "nvda {nvda_out}");
 
-    // NAV re-priced through DIA after swaps (mock over-delivers vs price).
-    assert_eq!(s.vault().portfolio_value(&id), 12_800_000_000i128);
+    // NAV re-priced through DIA after swaps; small spread loss vs $80 pre-trade.
+    let nav = s.vault().portfolio_value(&id);
+    assert!(nav > 7_900_000_000 && nav < 8_000_000_000, "nav {nav}");
 }
 
 #[test]
@@ -188,7 +172,7 @@ fn withdraw_pays_pro_rata_slice_and_burns() {
         &id,
         &(TS + 3600),
         &50,
-        &vec![&s.env, 119_999_999i128, 79_999_999i128],
+        &vec![&s.env, 50_000_000i128, 60_000_000i128],
     );
 
     let share_token = s.vault().get_bucket(&id).share_token;

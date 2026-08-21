@@ -3,11 +3,10 @@
 mod dia;
 #[cfg(test)]
 mod test;
-mod router;
 
 use soroban_sdk::{
     contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error,
-    symbol_short, vec, Address, Env, Map, String, Symbol, Vec,
+    symbol_short, Address, Env, Map, String, Symbol, Vec,
 };
 use soroban_sdk::token::Client as TokenClient;
 
@@ -29,7 +28,6 @@ pub struct Config {
     /// DIA key of the deposit asset, e.g. "USDC/USD".
     pub usdc_key: String,
     pub dia_oracle: Address,
-    pub router: Address,
     pub staleness_secs: u64,
     pub drift_bps: u32,
 }
@@ -52,6 +50,18 @@ pub struct Bucket {
     pub share_token: Address,
 }
 
+/// Internal USDC<->asset pool owned by the vault. Reserves are tokens the
+/// vault already custodies; swaps are pure reserve accounting, no transfers.
+/// ponytail: 0-fee constant product; admin seeds liquidity, so prices track
+/// whatever ratio admin seeds (re-seed to follow DIA). Add a fee if third
+/// parties ever trade against these pools.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pool {
+    pub usdc_res: i128,
+    pub asset_res: i128,
+}
+
 #[contracttype]
 pub enum DataKey {
     Config,
@@ -59,6 +69,8 @@ pub enum DataKey {
     Bucket(u32),
     /// asset -> raw balance; includes idle USDC.
     Balances(u32),
+    /// asset -> vault-owned swap reserves.
+    Pool(Address),
 }
 
 #[contracterror]
@@ -98,7 +110,6 @@ impl BucketVault {
         usdc: Address,
         usdc_key: String,
         dia_oracle: Address,
-        router: Address,
         staleness_secs: u64,
         drift_bps: u32,
     ) {
@@ -112,7 +123,6 @@ impl BucketVault {
             usdc,
             usdc_key,
             dia_oracle,
-            router,
             staleness_secs,
             drift_bps,
         };
@@ -269,7 +279,6 @@ impl BucketVault {
             return;
         }
         let drift_floor = (total as u128) * (cfg.drift_bps as u128) / 10_000;
-        let self_addr = e.current_contract_address();
         let usdc_dec = TokenClient::new(e, &cfg.usdc).decimals();
 
         for (i, a) in bucket.allocations.iter().enumerate() {
@@ -294,18 +303,7 @@ impl BucketVault {
                 if sell_amt <= 0 {
                     continue;
                 }
-                // ponytail: approve-per-swap (exact amount) instead of tracking
-                // standing router allowances; two extra CPIs, zero approval bookkeeping.
-                TokenClient::new(e, &a.asset).approve(&self_addr, &cfg.router, &sell_amt, &300);
-                let out = router::swap(
-                    e,
-                    &cfg.router,
-                    sell_amt,
-                    min_out,
-                    vec![e, a.asset.clone(), cfg.usdc.clone()],
-                    &self_addr,
-                    deadline,
-                );
+                let out = Self::swap_via_pool(e, &a.asset, false, sell_amt, min_out);
                 b.set(a.asset.clone(), held - sell_amt);
                 b.set(cfg.usdc.clone(), b.get(cfg.usdc.clone()).unwrap_or(0) + out);
             } else {
@@ -316,16 +314,7 @@ impl BucketVault {
                 if buy_usdc_amt <= 0 {
                     continue;
                 }
-                TokenClient::new(e, &cfg.usdc).approve(&self_addr, &cfg.router, &buy_usdc_amt, &300);
-                let out = router::swap(
-                    e,
-                    &cfg.router,
-                    buy_usdc_amt,
-                    min_out,
-                    vec![e, cfg.usdc.clone(), a.asset.clone()],
-                    &self_addr,
-                    deadline,
-                );
+                let out = Self::swap_via_pool(e, &a.asset, true, buy_usdc_amt, min_out);
                 b.set(cfg.usdc.clone(), idle - buy_usdc_amt);
                 b.set(a.asset.clone(), held + out);
             }
@@ -344,6 +333,29 @@ impl BucketVault {
         Self::bucket(e, bucket_id)
     }
 
+    /// Admin funds the vault's swap reserves for `asset` (admin must have
+    /// approved the vault on both tokens). Pool price = reserve ratio.
+    pub fn seed_pool(e: &Env, asset: Address, usdc_amount: i128, asset_amount: i128) {
+        let cfg = Self::config(e);
+        cfg.admin.require_auth();
+        if usdc_amount <= 0 || asset_amount <= 0 {
+            panic_with_error!(e, VaultError::Overflow);
+        }
+        let self_addr = e.current_contract_address();
+        TokenClient::new(e, &cfg.usdc).transfer_from(&self_addr, &cfg.admin, &self_addr, &usdc_amount);
+        TokenClient::new(e, &asset).transfer_from(&self_addr, &cfg.admin, &self_addr, &asset_amount);
+
+        let mut p = Self::pool_get(e, &asset);
+        p.usdc_res += usdc_amount;
+        p.asset_res += asset_amount;
+        e.storage().persistent().set(&DataKey::Pool(asset.clone()), &p);
+        e.events().publish((symbol_short!("seeded"), asset), (usdc_amount, asset_amount));
+    }
+
+    pub fn get_pool(e: &Env, asset: Address) -> Pool {
+        Self::pool_get(e, &asset)
+    }
+
     pub fn bucket_count(e: &Env) -> u32 {
         e.storage().instance().get::<_, u32>(&DataKey::NextBucketId).unwrap_or(0)
     }
@@ -358,6 +370,44 @@ impl BucketVault {
     }
 
     // ---------- internals ----------
+
+    fn pool_get(e: &Env, asset: &Address) -> Pool {
+        e.storage()
+            .persistent()
+            .get(&DataKey::Pool(asset.clone()))
+            .unwrap_or(Pool { usdc_res: 0, asset_res: 0 })
+    }
+
+    /// Constant-product swap against vault-owned reserves. No token movement:
+    /// reserves and bucket balances are both internal ledger entries.
+    fn swap_via_pool(e: &Env, asset: &Address, usdc_to_asset: bool, amount_in: i128, min_out: i128) -> i128 {
+        if amount_in <= 0 {
+            panic_with_error!(e, VaultError::Overflow);
+        }
+        let mut p = Self::pool_get(e, asset);
+        let (res_in, res_out) = if usdc_to_asset {
+            (p.usdc_res, p.asset_res)
+        } else {
+            (p.asset_res, p.usdc_res)
+        };
+        if res_in <= 0 || res_out <= 0 {
+            panic_with_error!(e, VaultError::NoPrice);
+        }
+        let out = ((amount_in as u128) * (res_out as u128) / ((res_in as u128) + (amount_in as u128)))
+            as i128;
+        if out < min_out {
+            panic_with_error!(e, VaultError::SlippageTooHigh);
+        }
+        if usdc_to_asset {
+            p.usdc_res += amount_in;
+            p.asset_res -= out;
+        } else {
+            p.asset_res += amount_in;
+            p.usdc_res -= out;
+        }
+        e.storage().persistent().set(&DataKey::Pool(asset.clone()), &p);
+        out
+    }
 
     fn config(e: &Env) -> Config {
         e.storage()
