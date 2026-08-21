@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["bucket-vault", "share-token"]
+members = ["bucket-vault", "dia-oracle", "share-token"]
 
 [workspace.dependencies]
 soroban-sdk = "23"

@@ -1,5 +1,10 @@
 #![cfg(test)]
 
+// ponytail: raw wasm bytes instead of contractimport! (OZ event specs trip its
+// parser). Run `stellar contract build` once before `cargo test`.
+const SHARE_TOKEN_WASM: &[u8] =
+    include_bytes!("../../target/wasm32v1-none/release/share_token.wasm");
+
 use crate::{
     dia::OracleValue,
     {Allocation, BucketVault, BucketVaultClient, VaultError},
@@ -66,11 +71,13 @@ fn setup() -> Setup {
 
     let vault_addr = env.register(BucketVault, ());
     let vault = BucketVaultClient::new(&env, &vault_addr);
+    let share_wasm_hash = env.deployer().upload_contract_wasm(SHARE_TOKEN_WASM);
     vault.initialize(
         &admin,
         &usdc,
         &key(&env, "USDC/USD"),
         &oracle,
+        &share_wasm_hash,
         &300,
         &500,
     );
@@ -95,21 +102,13 @@ fn setup() -> Setup {
 }
 
 fn make_bucket(s: &Setup) -> u32 {
-    let share_token = s.env.register(
-        share_token::ShareToken,
-        share_token::ShareTokenArgs::__constructor(
-            &s.vault_addr,
-            &String::from_str(&s.env, "Tech Ten"),
-            &String::from_str(&s.env, "TECH10"),
-        ),
-    );
     let allocs = vec![
         &s.env,
         Allocation { asset: s.aapl.clone(), dia_key: key(&s.env, "AAPL/USD"), target_bps: 6_000 },
         Allocation { asset: s.nvda.clone(), dia_key: key(&s.env, "NVDA/USD"), target_bps: 4_000 },
     ];
     s.vault()
-        .create_bucket(&String::from_str(&s.env, "Tech Ten"), &allocs, &share_token)
+        .create_bucket(&String::from_str(&s.env, "Tech Ten"), &allocs)
 }
 
 #[test]

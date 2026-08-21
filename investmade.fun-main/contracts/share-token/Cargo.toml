@@ -10,3 +10,6 @@ crate-type = ["cdylib", "rlib"]
 soroban-sdk = { workspace = true }
 stellar-tokens = "=0.5.0"
 stellar-macros = "=0.5.0"
+
+[features]
+testutils = ["soroban-sdk/testutils"]

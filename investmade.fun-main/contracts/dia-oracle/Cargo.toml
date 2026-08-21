@@ -1,5 +1,5 @@
 [package]
-name = "bucket-vault"
+name = "dia-oracle"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,6 +9,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 soroban-sdk = { workspace = true }
 
+[features]
+testutils = ["soroban-sdk/testutils"]
+
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-share-token = { path = "../share-token", features = ["testutils"] }

@@ -6,7 +6,7 @@ mod test;
 
 use soroban_sdk::{
     contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error,
-    symbol_short, Address, Env, Map, String, Symbol, Vec,
+    symbol_short, Address, BytesN, Env, Map, String, Symbol, Vec,
 };
 use soroban_sdk::token::Client as TokenClient;
 
@@ -28,6 +28,9 @@ pub struct Config {
     /// DIA key of the deposit asset, e.g. "USDC/USD".
     pub usdc_key: String,
     pub dia_oracle: Address,
+    /// Wasm hash of the deployed share-token contract; the vault deploys one
+    /// instance per user basket.
+    pub share_token_wasm: BytesN<32>,
     pub staleness_secs: u64,
     pub drift_bps: u32,
 }
@@ -110,6 +113,7 @@ impl BucketVault {
         usdc: Address,
         usdc_key: String,
         dia_oracle: Address,
+        share_token_wasm: BytesN<32>,
         staleness_secs: u64,
         drift_bps: u32,
     ) {
@@ -123,6 +127,7 @@ impl BucketVault {
             usdc,
             usdc_key,
             dia_oracle,
+            share_token_wasm,
             staleness_secs,
             drift_bps,
         };
@@ -141,11 +146,11 @@ impl BucketVault {
         e.storage().instance().set(&DataKey::Config, &cfg);
     }
 
-    /// Admin pre-deploys a ShareToken instance (constructor: vault addr, name,
-    /// symbol), then registers it here. Returns the bucket id.
-    pub fn create_bucket(e: &Env, name: String, allocations: Vec<Allocation>, share_token: Address) -> u32 {
+    /// Anyone may create a basket (the swipe UX builds one per user). The
+    /// vault deploys the share token itself, so no pre-registration step.
+    /// Returns the bucket id; share token address is on get_bucket(id).
+    pub fn create_bucket(e: &Env, name: String, allocations: Vec<Allocation>) -> u32 {
         let cfg = Self::config(e);
-        cfg.admin.require_auth();
 
         if name.is_empty() || name.len() > 64 || allocations.is_empty() || allocations.len() > MAX_ALLOCATIONS {
             panic_with_error!(e, VaultError::BadAllocation);
@@ -168,6 +173,21 @@ impl BucketVault {
 
         let id = e.storage().instance().get::<_, u32>(&DataKey::NextBucketId).unwrap_or(0);
         e.storage().instance().set(&DataKey::NextBucketId, &(id + 1));
+        e.events().publish((symbol_short!("dbgid"),), id);
+
+        // ponytail: fixed symbol; name carries the identity.
+        let symbol = String::from_str(e, "SWYFT");
+        let salt: BytesN<32> = e.prng().gen();
+        e.events().publish((symbol_short!("dbgpre"),), id);
+        let share_token = e
+            .deployer()
+            .with_current_contract(salt)
+            .deploy_v2(
+                cfg.share_token_wasm,
+                (e.current_contract_address(), name.clone(), symbol),
+            );
+        e.events().publish((symbol_short!("dbgpost"), (id,)), share_token.clone());
+
         let bucket = Bucket { id, name, allocations, share_token };
         e.storage().persistent().set(&DataKey::Bucket(id), &bucket);
         Self::save_balances(e, id, &Map::new(e));
