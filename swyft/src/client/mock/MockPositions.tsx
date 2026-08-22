@@ -1,9 +1,9 @@
 import { HandCoins, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { formatUnits } from "viem";
-import type { Candidate } from "../../domain/schemas";
-import { api } from "../api";
-import { AssetMark } from "../components/AssetMark";
+import {
+	getWalletPortfolio,
+	type WalletPortfolioPayload,
+} from "../stellar/portfolio-api";
 
 const usdFormatter = new Intl.NumberFormat("en-US", {
 	style: "currency",
@@ -11,57 +11,26 @@ const usdFormatter = new Intl.NumberFormat("en-US", {
 	maximumFractionDigits: 2,
 });
 
-/** Stellar-only portfolio surface for the mock UI. */
-export function MockPositions({
-	candidates,
-	wallet,
-}: {
-	candidates: Candidate[];
-	wallet: string;
-}) {
+/** Per-wallet Stellar baskets (one owner per bucket) + marked PnL. */
+export function MockPositions({ wallet }: { wallet: string; candidates?: unknown }) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
-	const [rows, setRows] = useState<
-		Array<{
-			candidate: Candidate;
-			balanceBaseUnits: string;
-		}>
-	>([]);
-	const [status, setStatus] = useState<Record<string, string>>({});
+	const [portfolio, setPortfolio] = useState<WalletPortfolioPayload>();
 
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setError("");
-		void api
-			.robinhoodPortfolio(wallet)
-			.then((portfolio) => {
-				if (cancelled) return;
-				const byId = new Map(
-					candidates.map((candidate) => [candidate.assetId, candidate]),
-				);
-				setRows(
-					portfolio.tokens.flatMap((token) => {
-						const known = byId.get(token.assetId);
-						if (!known) return [];
-						return [
-							{
-								candidate: {
-									...known,
-									marketPriceUsd: token.priceUsd ?? known.marketPriceUsd,
-								},
-								balanceBaseUnits: token.balanceBaseUnits,
-							},
-						];
-					}),
-				);
+		void getWalletPortfolio(wallet)
+			.then((data) => {
+				if (!cancelled) setPortfolio(data);
 			})
 			.catch((caught) => {
 				if (!cancelled) {
 					setError(
 						caught instanceof Error
 							? caught.message
-							: "Could not read Stellar balances.",
+							: "Could not load basket portfolio. Is stellar-api running?",
 					);
 				}
 			})
@@ -71,98 +40,84 @@ export function MockPositions({
 		return () => {
 			cancelled = true;
 		};
-	}, [candidates, wallet]);
-
-	async function exitPosition(candidate: Candidate) {
-		setStatus((current) => ({ ...current, [candidate.assetId]: "Submitting…" }));
-		try {
-			await new Promise((resolve) => window.setTimeout(resolve, 600));
-			setStatus((current) => ({
-				...current,
-				[candidate.assetId]: "Simulated Stellar exit complete",
-			}));
-			setRows((current) =>
-				current.filter((row) => row.candidate.assetId !== candidate.assetId),
-			);
-		} catch (caught) {
-			setStatus((current) => ({
-				...current,
-				[candidate.assetId]:
-					caught instanceof Error ? caught.message : "Exit failed",
-			}));
-		}
-	}
+	}, [wallet]);
 
 	return (
 		<main className="positions-page">
 			<header className="positions-heading">
 				<div>
 					<span className="eyebrow">Portfolio</span>
-					<h1>Your Stellar holdings</h1>
-					<p>Stellar balances, price context, and supported exits.</p>
+					<h1>Your Stellar baskets</h1>
+					<p>
+						Each swipe session creates your own on-chain bucket. Track cost
+						basis and marked PnL here.
+					</p>
 				</div>
 			</header>
+
 			{loading ? (
 				<div className="positions-loading">
 					<LoaderCircle />
-					<span>Loading Stellar portfolio…</span>
+					<span>Loading baskets…</span>
 				</div>
 			) : null}
+
 			{error ? (
 				<div className="error-message" role="alert">
 					{error}
 				</div>
 			) : null}
-			{!loading && !rows.length ? (
+
+			{portfolio ? (
+				<section className="portfolio-summary">
+					<div className="portfolio-summary-meta">
+						<span>Total marked value</span>
+						<div className="portfolio-summary-value-row">
+							<strong>{usdFormatter.format(portfolio.currentNavUsd)}</strong>
+						</div>
+						<small>
+							Cost {usdFormatter.format(portfolio.costBasisUsd)} · PnL{" "}
+							{usdFormatter.format(portfolio.pnlUsd)} (
+							{portfolio.pnlPct.toFixed(2)}%) · {portfolio.basketCount} baskets
+						</small>
+					</div>
+				</section>
+			) : null}
+
+			{!loading && portfolio && !portfolio.baskets.length ? (
 				<div className="empty-page">
 					<HandCoins size={28} />
-					<h2>No holdings yet</h2>
-					<p>Complete a Swyft basket on Stellar to see positions here.</p>
+					<h2>No baskets yet</h2>
+					<p>Invest on Stellar from Review to create your first personal bucket.</p>
 				</div>
 			) : null}
+
 			<div className="positions-list">
-				{rows.map(({ candidate, balanceBaseUnits }) => {
-					const amount = Number(
-						formatUnits(BigInt(balanceBaseUnits), candidate.decimals),
-					);
-					const value =
-						candidate.marketPriceUsd !== undefined
-							? amount * candidate.marketPriceUsd
-							: undefined;
-					return (
-						<article className="position-row" key={candidate.assetId}>
-							<AssetMark
-								symbol={candidate.symbol}
-								iconUrl={candidate.iconUrl}
-								size="md"
-							/>
-							<div className="position-copy">
-								<strong>{candidate.symbol}</strong>
-								<small>{candidate.name}</small>
-							</div>
-							<div className="position-metrics">
-								<span>
-									{amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-								</span>
-								<small>
-									{value !== undefined ? usdFormatter.format(value) : "—"}
-								</small>
-							</div>
-							<button
-								type="button"
-								className="button button-outline button-sell"
-								onClick={() => void exitPosition(candidate)}
+				{portfolio?.baskets.map((basket) => (
+					<article className="position-row basket-row" key={basket.id}>
+						<div className="position-copy">
+							<strong>
+								{basket.name} · #{basket.bucketId}
+							</strong>
+							<small>
+								{basket.allocations.map((a) => a.symbol).join(" · ")} ·{" "}
+								{basket.sharesOutstanding} shares
+							</small>
+						</div>
+						<div className="position-metrics">
+							<span>{usdFormatter.format(basket.pnl.currentNavUsd)}</span>
+							<small
+								className={
+									basket.pnl.pnlUsd >= 0 ? "pnl-up" : "pnl-down"
+								}
 							>
-								Exit
-							</button>
-							{status[candidate.assetId] ? (
-								<small className="position-status">
-									{status[candidate.assetId]}
-								</small>
-							) : null}
-						</article>
-					);
-				})}
+								{basket.pnl.pnlUsd >= 0 ? "+" : ""}
+								{usdFormatter.format(basket.pnl.pnlUsd)} (
+								{basket.pnl.pnlPct.toFixed(2)}%)
+							</small>
+						</div>
+					</article>
+				))}
 			</div>
 		</main>
 	);

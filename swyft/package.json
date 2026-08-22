@@ -12,6 +12,8 @@
     "dev:live": "concurrently -k \"npm:dev:server\" \"npm:dev:web\"",
     "dev:web": "vite",
     "dev:server": "tsx watch src/server/index.ts",
+    "dev:stellar-api": "tsx watch src/server/stellar-portfolio/index.ts",
+    "dev:stack": "concurrently -k \"npm:dev:stellar-api\" \"npm:dev:mock\"",
     "build": "tsc -b && vite build",
     "start": "NODE_ENV=production tsx src/server/index.ts",
     "lint": "biome lint src tests scripts",
@@ -56,7 +58,8 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "viem": "2.55.5",
-    "zod": "^4.0.10"
+    "zod": "^4.0.10",
+    "mongoose": "^8.18.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

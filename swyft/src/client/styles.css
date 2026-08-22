@@ -1947,7 +1947,12 @@ a.asset-rank-tag:focus-visible { outline: 2px solid currentColor; outline-offset
 }
 .button-sell svg { width: 18px; height: 18px; }
 .button-sell .button-spinner { animation: spin .8s linear infinite; }
-.position-status { grid-column: 1 / -1; color: var(--blue) !important; white-space: normal !important; }
+.basket-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 16px 14px;
+}
+.pnl-up { color: var(--acid) !important; }
+.pnl-down { color: var(--coral) !important; }
 
 .account-rules {
   display: grid;

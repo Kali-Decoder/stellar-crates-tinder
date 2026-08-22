@@ -14,11 +14,12 @@ import { ArrowRight, Check, Close, Shield } from "../components/Icons";
 import { explorerTxUrl, stellarConfig, USDC_DECIMALS } from "../stellar/config";
 import {
 	buildAllocationsFromSymbols,
-	hasStellarToken,
 	investBasket,
 	readUsdcBalance,
 	usdToUsdcBaseUnits,
 } from "../stellar/vault";
+import { hasStellarToken } from "../stellar/config";
+import { recordStellarBasket } from "../stellar/portfolio-api";
 import { shortStellarAddress } from "../stellar/kit";
 
 export function MockReview({
@@ -158,6 +159,22 @@ export function MockReview({
 				usdAmount: total,
 				onPhase: setStatusLine,
 			});
+
+			try {
+				await recordStellarBasket({
+					ownerWallet: wallet,
+					bucketId: result.bucketId,
+					name: `Swyft ${onchainSymbols.slice(0, 3).join("-")}`,
+					allocations: buildAllocationsFromSymbols(onchainSymbols),
+					depositUsd: total,
+					shares: result.shares,
+					createTxHash: result.createHash,
+					approveTxHash: result.approveHash,
+					depositTxHash: result.depositHash,
+				});
+			} catch (persistError) {
+				console.warn("Basket portfolio persist failed", persistError);
+			}
 
 			const settled: ExecutionRecord = {
 				...record,

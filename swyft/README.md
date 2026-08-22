@@ -7,6 +7,9 @@ swyft.fun is a non-custodial, fixed-budget swipe allocation app on **Stellar**. 
 ```bash
 npm ci --cache .npm-cache
 npm run dev          # mock UI + Freighter on Stellar testnet → http://localhost:5173
+npm run dev:stack    # UI + stellar portfolio API (:8787, Mongo optional)
+npm run dev:stellar-api  # portfolio/baskets/PnL API only
+
 npm test             # client/domain vitest suite
 npm run test:contracts
 ```
@@ -24,7 +27,11 @@ Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit
 
 | Path | What it is |
 |---|---|
-| `src/client/` | React/Vite UI — landing → Freighter → plan → swipe → review → portfolio |
+| `src/server/stellar-portfolio/` | Mongo (or memory) API: baskets, portfolio, PnL |
+| `docs/STELLAR_PORTFOLIO_API.md` | Portfolio API reference |
+
+Set `MONGODB_URI` for persistence. Without it the API uses an in-memory store.
+
 | `src/client/stellar/` | Kit, RPC, vault invest, **DIA RWA charts/spot** (`dia-api.ts`) |
 | `src/client/mock/` | Default product surface (no Privy/Express required) |
 | `src/domain/` | Shared schemas, budgets, tags, policy helpers |
@@ -38,8 +45,9 @@ Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit
 1. Land on swyft.fun → **Sign in** with Freighter.
 2. Set cadence, period limit, ticket size, risk, asset mix.
 3. Swipe assets into a basket (vault-deployed symbols preferred).
-4. Review → **Invest on Stellar** signs three txs: `create_bucket` → USDC `approve` → `deposit`.
-5. Hold share tokens; receipt links to [Stellar Expert](https://stellar.expert/explorer/testnet).
+4. Review → **Invest on Stellar** signs three txs: `create_bucket` → USDC `approve` → `deposit` (each user gets their **own** bucket; many baskets per wallet are supported).
+5. Basket metadata + PnL are stored via `/api/stellar/*` (Mongo when `MONGODB_URI` is set).
+6. Hold share tokens; receipt links to [Stellar Expert](https://stellar.expert/explorer/testnet).
 
 Or use **Simulate only** for a local demo receipt without broadcasting.
 
