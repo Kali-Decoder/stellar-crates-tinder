@@ -1,0 +1,542 @@
+[
+  {
+    "symbol": "DGC",
+    "name": "Denario Gold Coin",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "DSC",
+    "name": "Denario Silver Coin",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "NG",
+    "name": "Natural Gas",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "WTI",
+    "name": "Crude Oil",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "XAGG",
+    "name": "Silver",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "XAU",
+    "name": "Gold",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "XBR",
+    "name": "Brent Oil",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "XG",
+    "name": "Copper",
+    "type": "Commodity"
+  },
+  {
+    "symbol": "ARKB",
+    "name": "Bitcoin ETF Ark 21Shares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "BETH",
+    "name": "Bitcoin & Ether Market Cap Weight ETF ProShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "BITO",
+    "name": "Bitcoin Strategy ETF ProShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "EEM",
+    "name": "MSCI Emerging Markets ETF",
+    "type": "ETF"
+  },
+  {
+    "symbol": "ETHA",
+    "name": "Ethereum Trust ETHA iShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "FBTC",
+    "name": "Bitcoin Index Fund Fidelity Wise Origin",
+    "type": "ETF"
+  },
+  {
+    "symbol": "GBTC",
+    "name": "Bitcoin Trust (BTC) Grayscale",
+    "type": "ETF"
+  },
+  {
+    "symbol": "GOVT",
+    "name": "U.S. Treasury Bond ETF iShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "HODL",
+    "name": "Bitcoin ETF VanEck",
+    "type": "ETF"
+  },
+  {
+    "symbol": "IBIT",
+    "name": "Bitcoin Trust iShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "IVV",
+    "name": "Core S&P 500 ETF",
+    "type": "ETF"
+  },
+  {
+    "symbol": "QQQ",
+    "name": "QQQ Trust Invesco",
+    "type": "ETF"
+  },
+  {
+    "symbol": "SHY",
+    "name": "1-3 Year Treasury Bond ETF iShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "SPY",
+    "name": "S&P 500 ETF Trust SPDR",
+    "type": "ETF"
+  },
+  {
+    "symbol": "TLT",
+    "name": "20+ Year Treasury Bond ETF iShares",
+    "type": "ETF"
+  },
+  {
+    "symbol": "URTH",
+    "name": "MSCI World ETF",
+    "type": "ETF"
+  },
+  {
+    "symbol": "VGSH",
+    "name": "Short-Term Treasury Fund Vanguard",
+    "type": "ETF"
+  },
+  {
+    "symbol": "VOO",
+    "name": "S&P 500 ETF Vanguard",
+    "type": "ETF"
+  },
+  {
+    "symbol": "VTI",
+    "name": "Total Stock Market ETF Vanguard",
+    "type": "ETF"
+  },
+  {
+    "symbol": "AUD",
+    "name": "Australian Dollar",
+    "type": "FX"
+  },
+  {
+    "symbol": "BRL",
+    "name": "Brazilian Real",
+    "type": "FX"
+  },
+  {
+    "symbol": "CAD",
+    "name": "Canadian Dollar",
+    "type": "FX"
+  },
+  {
+    "symbol": "CHF",
+    "name": "Swiss Franc",
+    "type": "FX"
+  },
+  {
+    "symbol": "CNY",
+    "name": "Chinese Yuan",
+    "type": "FX"
+  },
+  {
+    "symbol": "EUR",
+    "name": "Euro",
+    "type": "FX"
+  },
+  {
+    "symbol": "GBP",
+    "name": "Pound Sterling",
+    "type": "FX"
+  },
+  {
+    "symbol": "JPY",
+    "name": "Japanese Yen",
+    "type": "FX"
+  },
+  {
+    "symbol": "NGN",
+    "name": "Nigerian Naira",
+    "type": "FX"
+  },
+  {
+    "symbol": "AAPL",
+    "name": "Apple Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "ABBV",
+    "name": "AbbVie Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "ABT",
+    "name": "Abbott Laboratories",
+    "type": "Stock"
+  },
+  {
+    "symbol": "ADBE",
+    "name": "Adobe Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "AMAT",
+    "name": "Applied Materials Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "AMD",
+    "name": "Advanced Micro Devices, Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "AMGN",
+    "name": "Amgen Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "AMZN",
+    "name": "Amazon.com Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "AVGO",
+    "name": "Broadcom Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "AXP",
+    "name": "American Express Co.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "BAC",
+    "name": "Bank of America Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "BLK",
+    "name": "BlackRock Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "BRKB",
+    "name": "Berkshire Hathaway Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "CAT",
+    "name": "Caterpillar Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "CMCSA",
+    "name": "Comcast Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "CME",
+    "name": "CME Group Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "COIN",
+    "name": "Coinbase Global Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "COP",
+    "name": "ConocoPhillips",
+    "type": "Stock"
+  },
+  {
+    "symbol": "COST",
+    "name": "Costco Wholesale Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "CRM",
+    "name": "Salesforce Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "CSCO",
+    "name": "Cisco Systems, Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "CVX",
+    "name": "Chevron Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "DHR",
+    "name": "Danaher Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "DIS",
+    "name": "The Walt Disney Company",
+    "type": "Stock"
+  },
+  {
+    "symbol": "GE",
+    "name": "General Electric Company",
+    "type": "Stock"
+  },
+  {
+    "symbol": "GME",
+    "name": "Gamestop Corp.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "GOOG",
+    "name": "Alphabet Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "GS",
+    "name": "Goldman Sachs Group Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "HD",
+    "name": "Home Depot Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "HOOD",
+    "name": "Robinhood Markets Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "IBM",
+    "name": "International Business Machines Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "INTC",
+    "name": "Intel Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "INTU",
+    "name": "Intuit Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "JNJ",
+    "name": "Johnson & Johnson",
+    "type": "Stock"
+  },
+  {
+    "symbol": "JPM",
+    "name": "JPMorgan Chase & Co.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "KO",
+    "name": "The Coca-Cola Co.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "LLY",
+    "name": "Eli Lilly and Company",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MA",
+    "name": "Mastercard Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MCD",
+    "name": "McDonald's Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "META",
+    "name": "Meta Platforms Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MRK",
+    "name": "Merck & Co., Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MS",
+    "name": "Morgan Stanley",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MSFT",
+    "name": "Microsoft Corp.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MSTR",
+    "name": "MicroStrategy Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "MU",
+    "name": "Micron Technology Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "NEE",
+    "name": "NextEra Energy, Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "NFLX",
+    "name": "Netflix Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "NKE",
+    "name": "Nike Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "NOW",
+    "name": "ServiceNow Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "NVDA",
+    "name": "Nvidia Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "ORCL",
+    "name": "Oracle Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "PEP",
+    "name": "PepsiCo, Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "PFE",
+    "name": "Pfizer Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "PG",
+    "name": "Procter & Gamble Co.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "PM",
+    "name": "Philip Morris International Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "PYPL",
+    "name": "PayPal Holdings Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "QCOM",
+    "name": "Qualcomm Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "RTX",
+    "name": "RTX Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "SCHW",
+    "name": "Charles Schwab Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "TMO",
+    "name": "Thermo Fisher Scientific Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "TMUS",
+    "name": "T-Mobile US, Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "TSLA",
+    "name": "Tesla Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "TXN",
+    "name": "Texas Instruments Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "UBER",
+    "name": "Uber Technologies Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "UNH",
+    "name": "UnitedHealth Group Incorporated",
+    "type": "Stock"
+  },
+  {
+    "symbol": "UNP",
+    "name": "Union Pacific Corporation",
+    "type": "Stock"
+  },
+  {
+    "symbol": "V",
+    "name": "Visa Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "VFS",
+    "name": "VinFast Auto Ltd.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "VZ",
+    "name": "Verizon Communications Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "WFC",
+    "name": "Wells Fargo & Co.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "WMT",
+    "name": "Walmart Inc.",
+    "type": "Stock"
+  },
+  {
+    "symbol": "XOM",
+    "name": "Exxon Mobil Corporation",
+    "type": "Stock"
+  }
+]

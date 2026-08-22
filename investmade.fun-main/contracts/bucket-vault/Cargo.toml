@@ -1,0 +1,14 @@
+[package]
+name = "bucket-vault"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+share-token = { path = "../share-token", features = ["testutils"] }
