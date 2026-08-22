@@ -5,15 +5,15 @@ Each Freighter user creates **their own** on-chain bucket(s). This API stores po
 ## Run
 
 ```bash
-# optional Mongo
-export MONGODB_URI=mongodb://127.0.0.1:27017/swyft
+# from repo root — optional Mongo
+# cp server/.env.example server/.env
 
-# API on :8787 (Vite proxies /api → 8787)
-npm run dev:stellar-api
+cd server && npm install && npm run dev   # :8787
 
-# UI
-npm run dev
-# or both:
+# UI (Vite proxies /api → 8787)
+cd swyft && npm run dev
+
+# or both from swyft/:
 npm run dev:stack
 ```
 

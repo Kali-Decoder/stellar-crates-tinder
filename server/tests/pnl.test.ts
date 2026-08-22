@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeBasketPnl } from "../src/server/stellar-portfolio/pnl.js";
+import { computeBasketPnl } from "../src/pnl.js";
 
 describe("computeBasketPnl", () => {
 	it("marks single-owner basket by target weights and spot change", () => {

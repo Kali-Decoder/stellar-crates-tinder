@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { sha256 } from "../../domain/canonical.js";
+import { sha256 } from "../../src/domain/canonical.js";
 import {
 	ASSET_REGISTRY,
 	DEFAULT_SLOT_BUDGET,
 	FEED_PAGE_SIZE,
 	isDegenCommunityAsset,
-} from "../../domain/constants.js";
-import { unitPriceUsdFromQuote } from "../../domain/price.js";
+} from "../../src/domain/constants.js";
+import { unitPriceUsdFromQuote } from "../../src/domain/price.js";
 import type {
 	Candidate,
 	ExecutionProviderId,
@@ -16,7 +16,7 @@ import type {
 	RankingCandidate,
 	RankingInput,
 	RankingOutput,
-} from "../../domain/schemas.js";
+} from "../../src/domain/schemas.js";
 import type {
 	CandidateDiscoveryOptions,
 	CandidateProvider,

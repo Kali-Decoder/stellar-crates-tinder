@@ -1,4 +1,4 @@
-import type { RegistryAsset } from "../../domain/constants.js";
+import type { RegistryAsset } from "../../src/domain/constants.js";
 import type {
 	Candidate,
 	ExecutionProviderId,
@@ -8,7 +8,7 @@ import type {
 	RankingCandidate,
 	RankingInput,
 	RankingOutput,
-} from "../../domain/schemas.js";
+} from "../../src/domain/schemas.js";
 
 export type CandidateDiscoveryOptions = {
 	includeCommunity?: boolean;

@@ -16,7 +16,7 @@ import {
 	rankingInputSchema,
 } from "../src/domain/schemas.js";
 import { SOLANA_ASSET_REGISTRY } from "../src/domain/solana.js";
-import { DemoProvider } from "../src/server/adapters/demo.js";
+import { DemoProvider } from "./fixtures/demo.js";
 
 describe("deterministic feed policy", () => {
 	it("does not re-filter provider-quoted feed candidates", async () => {

@@ -1,9 +1,5 @@
 import {
-	ArrowLeft,
 	Bot,
-	ChevronLeft,
-	ChevronRight,
-	ArrowRight as LucideArrowRight,
 	ShoppingBasket,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -402,10 +398,10 @@ export function MockApp() {
 											aria-label="Skip asset"
 											disabled={Boolean(decisionFeedback)}
 										>
-											<ArrowLeft />
-											<span>
-												Skip<small>Swipe left</small>
+											<span className="gesture-dir" aria-hidden="true">
+												Left
 											</span>
+											<span className="gesture-label">Skip</span>
 										</button>
 										<SwipeCard
 											candidate={current}
@@ -424,10 +420,10 @@ export function MockApp() {
 											aria-label={`Add ${ticketSizeUsd} ${stableToken}`}
 											disabled={Boolean(decisionFeedback) || !canAddCurrent}
 										>
-											<LucideArrowRight />
-											<span>
-												Add<small>Swipe right</small>
+											<span className="gesture-dir" aria-hidden="true">
+												Right
 											</span>
+											<span className="gesture-label">Add</span>
 										</button>
 									</div>
 									{currentWarnings.length ? (
@@ -457,7 +453,7 @@ export function MockApp() {
 											onClick={() => animateDecision(false)}
 											disabled={Boolean(decisionFeedback)}
 										>
-											<ChevronLeft aria-hidden="true" /> Skip
+											Skip
 										</button>
 										<button
 											type="button"
@@ -476,8 +472,7 @@ export function MockApp() {
 											onClick={() => animateDecision(true)}
 											disabled={Boolean(decisionFeedback) || !canAddCurrent}
 										>
-											Add {ticketSizeUsd} {stableToken}{" "}
-											<ChevronRight aria-hidden="true" />
+											Add {ticketSizeUsd} {stableToken}
 										</button>
 									</div>
 								</>

@@ -1,10 +1,17 @@
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import express from "express";
 import { config as loadEnvironment } from "dotenv";
 import { connectMongo, mongoUri } from "./mongo.js";
 import { mountStellarPortfolioRoutes } from "./routes.js";
 
-loadEnvironment({ path: ".env.local" });
-loadEnvironment({ path: ".env" });
+const root = path.dirname(fileURLToPath(import.meta.url));
+const serverRoot = path.resolve(root, "..");
+loadEnvironment({ path: path.join(serverRoot, ".env.local") });
+loadEnvironment({ path: path.join(serverRoot, ".env") });
+// Fall back to swyft/.env when developing the monorepo side-by-side.
+loadEnvironment({ path: path.resolve(serverRoot, "../swyft/.env.local") });
+loadEnvironment({ path: path.resolve(serverRoot, "../swyft/.env") });
 
 const port = Number(process.env.STELLAR_PORTFOLIO_PORT ?? process.env.PORT ?? 8787);
 const origin = process.env.PUBLIC_ORIGIN ?? "http://localhost:5173";

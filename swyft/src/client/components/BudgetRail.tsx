@@ -99,40 +99,48 @@ export function BudgetRail({
 					Chain: <i aria-hidden="true" /> {network}
 				</span>
 			</div>
+			<div className="basket-head">
+				<h3>Your basket</h3>
+				<span>
+					{selected.length
+						? `${selected.length} asset${selected.length === 1 ? "" : "s"}`
+						: "Empty"}
+				</span>
+			</div>
 			{selected.length ? (
-				<>
-					<div className="basket-head">
-						<h3>Your basket</h3>
-						<span>{selected.length} assets</span>
-					</div>
-					<div className="basket-list">
-						{selected.map((candidate) => (
-							<div className="basket-row" key={candidate.assetId}>
-								<AssetMark
-									symbol={candidate.symbol}
-									iconUrl={candidate.iconUrl}
-									size="sm"
-								/>
-								<span className="basket-name">
-									<strong>{candidate.symbol}</strong>
-									<small>{candidate.name}</small>
-								</span>
-								<span className="basket-amount">
-									<strong>{formatTicketSizeUsd(ticketSizeUsd)}</strong>
-									<small>{token}</small>
-								</span>
-								<button
-									type="button"
-									onClick={() => onRemove(candidate.assetId)}
-									aria-label={`Remove ${candidate.symbol}`}
-								>
-									<Close />
-								</button>
-							</div>
-						))}
-					</div>
-				</>
-			) : null}
+				<div className="basket-list">
+					{selected.map((candidate) => (
+						<div className="basket-row" key={candidate.assetId}>
+							<AssetMark
+								symbol={candidate.symbol}
+								iconUrl={candidate.iconUrl}
+								size="sm"
+							/>
+							<span className="basket-name">
+								<strong>{candidate.symbol}</strong>
+								<small>{candidate.name}</small>
+							</span>
+							<span className="basket-amount">
+								<strong>{formatTicketSizeUsd(ticketSizeUsd)}</strong>
+								<small>{token}</small>
+							</span>
+							<button
+								type="button"
+								className="basket-remove"
+								onClick={() => onRemove(candidate.assetId)}
+								aria-label={`Remove ${candidate.symbol}`}
+							>
+								<Close />
+							</button>
+						</div>
+					))}
+				</div>
+			) : (
+				<div className="basket-empty">
+					<p>Swipe right to add</p>
+					<small>Assets you add land here before you invest.</small>
+				</div>
+			)}
 		</aside>
 	);
 }

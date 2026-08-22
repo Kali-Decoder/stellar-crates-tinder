@@ -17,7 +17,7 @@ npm run test:contracts
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Default Stellar mock UI (`VITE_MOCK_UI=true`) |
-| `npm run dev:live` | Legacy Privy + Express stack (Robinhood/Solana; not the product default) |
+| `npm run dev:stack` | UI + portfolio API (`../server` on :8787) |
 | `npm run build:contracts` | Build Soroban wasm (`wasm32v1-none`) |
 | `npm run test:contracts` | Build wasm, then `cargo test --workspace` |
 
@@ -27,18 +27,17 @@ Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit
 
 | Path | What it is |
 |---|---|
-| `src/server/stellar-portfolio/` | Mongo (or memory) API: baskets, portfolio, PnL |
+| `../server/` | Stellar portfolio Express API (Mongo or in-memory) |
 | `docs/STELLAR_PORTFOLIO_API.md` | Portfolio API reference |
-
-Set `MONGODB_URI` for persistence. Without it the API uses an in-memory store.
-
 | `src/client/stellar/` | Kit, RPC, vault invest, **DIA RWA charts/spot** (`dia-api.ts`) |
-| `src/client/mock/` | Default product surface (no Privy/Express required) |
+| `src/client/mock/` | Default product surface (no Express required) |
 | `src/domain/` | Shared schemas, budgets, tags, policy helpers |
 | `contracts/` | Soroban workspace: `bucket-vault`, `share-token`, `dia-oracle` |
-| `scripts/` | Deploy, price updater, create-bucket helpers |
+| `scripts/` | Deploy, oracle fetch/update, create-bucket helpers |
 | `docs/` | Architecture, user flow, contracts flow, checklists |
 | `tests/` | Vitest for client/domain still used by the UI |
+
+Set `MONGODB_URI` in `../server/.env` (or `swyft/.env`) for persistence. Without it the API uses an in-memory store.
 
 ## Product flow (short)
 
@@ -102,8 +101,7 @@ node scripts/price-updater.mjs --watch          # keep oracle feeds fresh
 - OpenZeppelin `stellar-tokens` / `stellar-macros` pinned `=0.5.0`
 - `ed25519-dalek = "=2.2.0"` (testutils compatibility)
 
-## Historical notes
+## Related
 
-- [investmade_fun.md](./investmade_fun.md) — original ETHGlobal brief (EVM-era).
-- [stellar_migration.md](./stellar_migration.md) — early Stellar migration plan (partially superseded).
-- `src/server/` and `npm run dev:live` still contain the older Robinhood/Solana + Privy stack; they are **not** the default product path.
+- Portfolio API: sibling [`../server`](../server) (`npm run dev:stack`)
+- Docs: [`docs/`](./docs/)

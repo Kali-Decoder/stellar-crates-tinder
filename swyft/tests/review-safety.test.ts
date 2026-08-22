@@ -5,7 +5,7 @@ import {
 	formatTicketSizeUsd,
 	ticketSizeToBaseUnits,
 } from "../src/domain/schemas.js";
-import { DemoProvider } from "../src/server/adapters/demo.js";
+import { DemoProvider } from "./fixtures/demo.js";
 import {
 	executionMatchesReviewBasket,
 	executionPlanHashMatchesReviewBasket,

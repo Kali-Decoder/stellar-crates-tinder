@@ -1,13 +1,13 @@
 # Architecture
 
-swyft.fun’s **default product** is a Stellar testnet UI: Freighter wallet, swipe-to-allocate, and Soroban vault deposits. The older Robinhood/Solana Express + Privy stack remains under `src/server/` for reference but is not required for `npm run dev`.
+swyft.fun’s **default product** is a Stellar testnet UI: Freighter wallet, swipe-to-allocate, and Soroban vault deposits. The portfolio API lives in the sibling `server/` package (not under `swyft/src`).
 
 ## Runtime modes
 
 | Mode | How | What runs |
 |---|---|---|
 | **Default** | `npm run dev` → `VITE_MOCK_UI=true` | Vite only. `MockApp` + fixture feed + Stellar kit/RPC |
-| **Live legacy** | `npm run dev:live` | Vite + Express + Privy (Robinhood/Solana) |
+| **Stack** | `npm run dev:stack` | Vite + `../server` portfolio API on :8787 |
 
 ```mermaid
 flowchart TB
@@ -79,7 +79,7 @@ flowchart LR
 
 ## Legacy server path (optional)
 
-`src/server/bootstrap.ts` still wires Demo / 0x / Uniswap / Jupiter / 0G providers for `dev:live`. That path uses Privy auth, PostgreSQL in production mode, and Alchemy portfolios. It is documented historically; Stellar invest does **not** go through Express.
+Basket metadata / PnL go through `../server` (`/api/stellar/*`). On-chain invest still signs directly in Freighter — it does not go through Express.
 
 ## Trust boundaries (Stellar path)
 
