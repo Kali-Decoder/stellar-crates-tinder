@@ -40,3 +40,30 @@ fn non_admin_cannot_write() {
     let v = vec![&e, OracleValue(1, 1)];
     client.set_prices(&k, &v);
 }
+
+#[test]
+#[should_panic(expected = "keys/values length mismatch")]
+fn set_prices_rejects_length_mismatch() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let id = e.register(DiaOracle, (&admin,));
+    let client = DiaOracleClient::new(&e, &id);
+    let keys: Vec<String> = vec![&e, "AAPL/USD".into_val(&e), "NVDA/USD".into_val(&e)];
+    let values = vec![&e, OracleValue(1, 1)];
+    client.set_prices(&keys, &values);
+}
+
+#[test]
+fn overwrite_price_updates_value() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let id = e.register(DiaOracle, (&admin,));
+    let client = DiaOracleClient::new(&e, &id);
+    let key: String = "AAPL/USD".into_val(&e);
+
+    client.set_prices(&vec![&e, key.clone()], &vec![&e, OracleValue(100, 10)]);
+    client.set_prices(&vec![&e, key.clone()], &vec![&e, OracleValue(200, 20)]);
+    assert_eq!(client.read_oracle_value(&key), OracleValue(200, 20));
+}

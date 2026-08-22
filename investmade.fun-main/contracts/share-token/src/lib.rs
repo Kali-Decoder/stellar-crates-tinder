@@ -49,3 +49,6 @@ impl FungibleToken for ShareToken {
 #[default_impl]
 #[contractimpl]
 impl FungibleBurnable for ShareToken {}
+
+#[cfg(test)]
+mod test;

@@ -11,6 +11,15 @@ import type {
 import { api } from "../api";
 import { AssetMark } from "../components/AssetMark";
 import { ArrowRight, Check, Close, Shield } from "../components/Icons";
+import { explorerTxUrl, stellarConfig, USDC_DECIMALS } from "../stellar/config";
+import {
+	buildAllocationsFromSymbols,
+	hasStellarToken,
+	investBasket,
+	readUsdcBalance,
+	usdToUsdcBaseUnits,
+} from "../stellar/vault";
+import { shortStellarAddress } from "../stellar/kit";
 
 export function MockReview({
 	session,
@@ -42,11 +51,19 @@ export function MockReview({
 	const [phase, setPhase] = useState<"refreshing" | "signing" | "idle">(
 		"refreshing",
 	);
+	const [statusLine, setStatusLine] = useState("");
 	const [error, setError] = useState("");
 	const [walletBalance, setWalletBalance] = useState<number>();
 	const [now, setNow] = useState(() => Date.now());
 	const total = Math.round(selected.length * ticketSizeUsd * 100) / 100;
 	const stableToken = "USDC";
+
+	const onchainSymbols = useMemo(
+		() => selected.map((c) => c.symbol).filter(hasStellarToken),
+		[selected],
+	);
+	const missingOnchain = selected.filter((c) => !hasStellarToken(c.symbol));
+	const canGoOnchain = onchainSymbols.length > 0;
 
 	const prepare = useCallback(async () => {
 		if (!selected.length) {
@@ -94,13 +111,10 @@ export function MockReview({
 
 	useEffect(() => {
 		let cancelled = false;
-		void api
-			.solanaBalance(wallet)
-			.then(({ usdcBalanceBaseUnits, usdcDecimals }) => {
+		void readUsdcBalance(wallet)
+			.then((base) => {
 				if (!cancelled) {
-					setWalletBalance(
-						Number(formatUnits(BigInt(usdcBalanceBaseUnits), usdcDecimals)),
-					);
+					setWalletBalance(Number(base) / 10 ** USDC_DECIMALS);
 				}
 			})
 			.catch(() => {
@@ -120,6 +134,62 @@ export function MockReview({
 				now,
 		);
 	}, [now, record]);
+
+	async function confirmOnchain() {
+		if (!record || !wallet) return;
+		setLoading(true);
+		setPhase("signing");
+		setError("");
+		setStatusLine("Preparing Stellar transactions…");
+		try {
+			buildAllocationsFromSymbols(onchainSymbols);
+			const needed = usdToUsdcBaseUnits(total);
+			const balance = await readUsdcBalance(wallet);
+			if (balance < needed) {
+				throw new Error(
+					`Need ${total.toFixed(2)} DEMOUSD on testnet (wallet has ${(Number(balance) / 10 ** USDC_DECIMALS).toFixed(2)}). Ask the demo faucet / admin to mint to your Freighter address.`,
+				);
+			}
+
+			const result = await investBasket({
+				source: wallet,
+				name: `Swyft ${onchainSymbols.slice(0, 3).join("-")} ${new Date().toISOString().slice(0, 10)}`,
+				symbols: onchainSymbols,
+				usdAmount: total,
+				onPhase: setStatusLine,
+			});
+
+			const settled: ExecutionRecord = {
+				...record,
+				status: "SETTLED",
+				transactionHashes: [
+					result.createHash,
+					result.approveHash,
+					result.depositHash,
+				],
+				settledAt: new Date().toISOString(),
+				settledOutputs: selected.map((candidate) => ({
+					assetId: candidate.assetId,
+					amountOutBaseUnits: candidate.quote?.estimatedAmountOut ?? "0",
+					transactionHash: result.depositHash,
+					status: "success" as const,
+				})),
+			};
+			setRecord(settled);
+			onExecutionChange(settled);
+			onSettled(settled);
+			setStatusLine(
+				`Bucket #${result.bucketId} · ${result.shares} shares minted`,
+			);
+		} catch (caught) {
+			setError(
+				caught instanceof Error ? caught.message : "On-chain invest failed",
+			);
+		} finally {
+			setLoading(false);
+			setPhase("idle");
+		}
+	}
 
 	async function confirmMock() {
 		if (!record) return;
@@ -159,16 +229,25 @@ export function MockReview({
 			<section className="review-ledger">
 				<header>
 					<h1>Review your basket</h1>
-					<p>Mock quotes are ready for a simulated confirmation.</p>
+					<p>
+						Confirm to create a Stellar bucket and deposit DEMOUSD into the
+						vault.
+					</p>
 					{error ? (
 						<p className="review-error" role="alert">
 							{error}
+						</p>
+					) : null}
+					{statusLine && phase === "signing" ? (
+						<p className="review-status" aria-live="polite">
+							{statusLine}
 						</p>
 					) : null}
 				</header>
 				<ul className="review-assets">
 					{selected.map((candidate) => {
 						const quote = quoteByAssetId.get(candidate.assetId) ?? candidate.quote;
+						const live = hasStellarToken(candidate.symbol);
 						return (
 							<li key={candidate.assetId}>
 								<div className="review-asset-main">
@@ -178,7 +257,10 @@ export function MockReview({
 									/>
 									<div>
 										<b>{candidate.name}</b>
-										<small>{candidate.symbol}</small>
+										<small>
+											{candidate.symbol}
+											{live ? " · Stellar" : " · not on vault"}
+										</small>
 									</div>
 									<button
 										type="button"
@@ -226,7 +308,8 @@ export function MockReview({
 				<header>
 					<h2>Confirm allocation</h2>
 					<p>
-						Wallet {walletBalance !== undefined
+						Wallet{" "}
+						{walletBalance !== undefined
 							? `${walletBalance.toFixed(2)} ${stableToken}`
 							: "…"}{" "}
 						· Quote {Math.ceil(quoteExpiry / 1000)}s
@@ -240,20 +323,42 @@ export function MockReview({
 						</dd>
 					</div>
 					<div>
+						<dt>On-chain assets</dt>
+						<dd>
+							{onchainSymbols.length}/{selected.length}
+						</dd>
+					</div>
+					<div>
 						<dt>Remaining budget</dt>
 						<dd>
 							{formatTicketSizeUsd(periodLimitUsd - total)} {stableToken}
 						</dd>
 					</div>
-					<div>
-						<dt>Ranking</dt>
-						<dd>{feed.proof.effectiveProvider ?? "DETERMINISTIC"}</dd>
-					</div>
 				</dl>
-				<div className="demo-disclosure">
-					Stellar preview: trading and settlement are simulated in this UI flow.
-					No onchain broadcast until live execution is enabled.
-				</div>
+				{missingOnchain.length ? (
+					<div className="demo-disclosure">
+						Skipped on-chain (no token deployed):{" "}
+						{missingOnchain.map((c) => c.symbol).join(", ")}. Equal weight
+						across {onchainSymbols.join(", ") || "—"}.
+					</div>
+				) : (
+					<div className="live-disclosure">
+						Live Stellar testnet: create_bucket → approve DEMOUSD → deposit into
+						vault {shortStellarAddress(stellarConfig.vault)}. You will sign 3
+						Freighter prompts.
+					</div>
+				)}
+				{record?.transactionHashes?.length ? (
+					<div className="live-disclosure">
+						{record.transactionHashes.map((hash) => (
+							<div key={hash}>
+								<a href={explorerTxUrl(hash)} target="_blank" rel="noreferrer">
+									View tx {hash.slice(0, 8)}…
+								</a>
+							</div>
+						))}
+					</div>
+				) : null}
 				<div className="review-actions">
 					<button type="button" className="button button-outline" onClick={onBack}>
 						Back
@@ -269,23 +374,31 @@ export function MockReview({
 					<button
 						type="button"
 						className="button button-primary"
-						onClick={() => void confirmMock()}
-						disabled={!record || loading || quoteExpiry <= 0}
+						onClick={() => void confirmOnchain()}
+						disabled={!record || loading || quoteExpiry <= 0 || !canGoOnchain}
 					>
 						{phase === "signing" ? (
 							<>
-								<LoaderCircle className="spin" /> Settling…
+								<LoaderCircle className="spin" /> {statusLine || "Signing…"}
 							</>
 						) : (
 							<>
-								Confirm & invest {formatTicketSizeUsd(total)} {stableToken}{" "}
+								Invest on Stellar {formatTicketSizeUsd(total)} {stableToken}{" "}
 								<Check />
 							</>
 						)}
 					</button>
+					<button
+						type="button"
+						className="button button-quiet"
+						onClick={() => void confirmMock()}
+						disabled={!record || loading}
+					>
+						Simulate only
+					</button>
 				</div>
 				<p className="review-policy">
-					<Shield /> Policy + plan hash checked locally against fixture quotes.{" "}
+					<Shield /> Vault mints share tokens; prices from DIA oracle.{" "}
 					<ArrowRight />
 				</p>
 			</aside>

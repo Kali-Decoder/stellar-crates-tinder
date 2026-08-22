@@ -1,130 +1,101 @@
 # swyft.fun
 
-swyft.fun is a non-custodial, fixed-budget swipe allocation app built on **Stellar**. Set a spending limit, swipe RWAs and crypto into a basket, deposit USDC, and hold share tokens backed by the basket. A keeper keeps the basket on target using real RWA prices from the [DIA](https://www.diadata.org/) oracle.
+swyft.fun is a non-custodial, fixed-budget swipe allocation app on **Stellar**. Set a spending limit, swipe RWAs into a basket, deposit DEMOUSD/USDC on testnet, and hold share tokens backed by that basket. A keeper rebalances toward target weights using DIA-compatible prices.
+
+## Quick start
+
+```bash
+npm ci --cache .npm-cache
+npm run dev          # mock UI + Freighter on Stellar testnet → http://localhost:5173
+npm test             # client/domain vitest suite
+npm run test:contracts
+```
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Default Stellar mock UI (`VITE_MOCK_UI=true`) |
+| `npm run dev:live` | Legacy Privy + Express stack (Robinhood/Solana; not the product default) |
+| `npm run build:contracts` | Build Soroban wasm (`wasm32v1-none`) |
+| `npm run test:contracts` | Build wasm, then `cargo test --workspace` |
+
+Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit-Tech/Stellar-Wallets-Kit) (Freighter) on Testnet.
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| `src/` | React/Vite app: landing → wallet → plan → swipe → portfolio (Stellar mock UI by default) |
-| `contracts/` | Soroban smart contracts (Rust workspace): `bucket-vault`, `share-token` |
-| `stellar_migration.md` | Original Stellar migration plan (superseded in parts, see below) |
-| `investmade_fun.md` | Original ETHGlobal research brief (historical) |
+| `src/client/` | React/Vite UI — landing → Freighter → plan → swipe → review → portfolio |
+| `src/client/stellar/` | Kit, RPC invoke helpers, vault invest path, deploy config |
+| `src/client/mock/` | Default product surface (no Privy/Express required) |
+| `src/domain/` | Shared schemas, budgets, tags, policy helpers |
+| `contracts/` | Soroban workspace: `bucket-vault`, `share-token`, `dia-oracle` |
+| `scripts/` | Deploy, price updater, create-bucket helpers |
+| `docs/` | Architecture, user flow, contracts flow, checklists |
+| `tests/` | Vitest for client/domain still used by the UI |
 
-Wallet connection uses `@creit.tech/stellar-wallets-kit` (Freighter etc.) on Testnet.
+## Product flow (short)
+
+1. Land on swyft.fun → **Sign in** with Freighter.
+2. Set cadence, period limit, ticket size, risk, asset mix.
+3. Swipe assets into a basket (vault-deployed symbols preferred).
+4. Review → **Invest on Stellar** signs three txs: `create_bucket` → USDC `approve` → `deposit`.
+5. Hold share tokens; receipt links to [Stellar Expert](https://stellar.expert/explorer/testnet).
+
+Or use **Simulate only** for a local demo receipt without broadcasting.
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | App + client + how UI talks to Soroban |
+| [docs/CONTRACTS.md](./docs/CONTRACTS.md) | **Contracts flow architecture** (vault, shares, oracle, invest path) |
+| [docs/USER_FLOW.md](./docs/USER_FLOW.md) | Screen-by-screen user journey |
+| [docs/STELLAR_CHECKLIST.md](./docs/STELLAR_CHECKLIST.md) | Testnet demo / release checklist |
+| [docs/CONTRACTS_TEST_MATRIX.md](./docs/CONTRACTS_TEST_MATRIX.md) | Contract + UI integration test matrix |
+
+## Contracts (summary)
+
+Three Soroban contracts:
+
+- **`bucket-vault`** — basket factory, USDC custody, share mint/burn, internal CP pools, rebalance.
+- **`share-token`** — SEP-41 share token; one instance per bucket; vault is admin/minter.
+- **`dia-oracle`** — DIA-shaped `read_oracle_value(key) → (price_8dec, ts)`; fed by `scripts/price-updater.mjs`.
+
+Invest path from the UI:
+
+```
+create_bucket(name, allocations)
+  → vault deploys share-token (admin = vault)
+approve(usdc → vault)
+deposit(bucket_id, amount)
+  → vault pulls USDC, mints shares @ pre-deposit NAV
+```
+
+Full diagrams and invariants: [docs/CONTRACTS.md](./docs/CONTRACTS.md).
 
 ```bash
-npm ci --cache .npm-cache
-npm run dev        # http://localhost:5173
+npm run test:contracts
+# or
+cd contracts && CARGO_TARGET_DIR=./target cargo test --workspace
 ```
 
-## Soroban contracts
-
-Two contracts instead of the four proposed in `stellar_migration.md`:
-
-```
-contracts/
-├── bucket-vault/          # basket factory + custody + rebalancer + internal AMM (one contract)
-│   ├── src/lib.rs         # create_bucket / deposit / withdraw / rebalance / seed_pool
-│   ├── src/dia.rs         # cross-contract reads from DIA's oracle, fail-closed staleness
-│   └── src/test.rs        # mock oracle + SAC token stand-ins
-└── share-token/           # OpenZeppelin SEP-41 fungible token, one instance per bucket
-```
-
-### Why two, not four
-
-- **Factory + Vault merged.** One custody surface beats a cross-contract permission layer.
-- **No custom price oracle contract.** DIA already runs an oracle on Soroban testnet (`CAEDPEZDRCEJCF73ASC5JGNKCIJDV2QJQSW6DJ6B74MYALBNKCJ5IFP4`). The vault reads it directly via CPI — no backend signing service needed.
-- **No external swap router.** The migration plan proposed classic `pathPayment` (impossible from Soroban) and a Soroswap-style router. Since demo RWA tokens are issued by this project anyway, the vault embeds a minimal constant-product pool per asset (`seed_pool`, admin-seeded). Rebalancing is then pure reserve accounting inside the contract — zero CPIs, zero approvals, and production code paths are identical to test paths. Swap out `swap_via_pool` for a real router later if third-party liquidity appears.
-- **Rebalancer lives inside the vault**, so the keeper calls one permissionless function.
-
-### User flow
-
-```
-admin    create_bucket(name, allocations[], share_token_addr)
-              allocations: [{asset, dia_key: "AAPL/USD", target_bps}, ...]
-         seed_pool(asset, usdc_amount, asset_amount)   # admin funds swap reserves
-
-user     deposit(bucket_id, usdc_amount)   -> mints SHARE TOKENS
-             shares priced at pre-deposit NAV; first depositor gets $1 = 1 share (8 decimals)
-
-keeper   rebalance(bucket_id, deadline, slippage_bps, min_outs[])
-             sells overweight assets -> USDC, buys underweight <- USDC against the
-             vault's internal pools; only when drift > drift_bps and trade > $1;
-             min_outs bound any caller
-
-user     withdraw(bucket_id, shares)       -> burns shares, pays out the pro-rata slice
-             of every holding including idle USDC
-```
-
-Users never hold individual RWA tokens; they hold shares of the whole basket. Prices are never stored on tokens — every valuation reads DIA live and **fails closed** if a feed is missing or stale (`staleness_secs`, ±60 s clock-skew window).
-
-### Contract interfaces
-
-`bucket-vault`
-
-| Function | Auth | Notes |
-|---|---|---|
-| `initialize(admin, usdc, usdc_key, dia_oracle, staleness_secs, drift_bps)` | admin | once |
-| `create_bucket(name, allocations, share_token) -> id` | admin | ≤20 allocations, bps sum ≤ 10 000, no duplicate assets |
-| `seed_pool(asset, usdc_amount, asset_amount)` | admin | funds the internal swap reserves; pool price = reserve ratio |
-| `deposit(bucket_id, from, amount) -> shares` | depositor | pulls USDC via allowance; prices against pre-deposit NAV |
-| `withdraw(bucket_id, user, shares)` | user | burns via allowance; pays pro-rata holdings |
-| `rebalance(bucket_id, deadline, slippage_bps, min_outs)` | anyone | swaps via internal pools; slippage hard-capped at 10 %; dust trades (< $1) skipped |
-| `get_bucket(id)`, `bucket_count()`, `holdings(id)`, `get_pool(asset)`, `portfolio_value(id)` | — | value in 8-decimal USD |
-
-`share-token`: OpenZeppelin `stellar-tokens` SEP-41 base, 8 decimals, mint restricted to the vault, plus `bump()` for instance-TTL upkeep (keeper calls it on a schedule).
-
-### Price data (DIA)
-
-Feeds are keyed strings such as `AAPL/USD`; each entry returns `(price_8dec, updated_unix)`. Configure each allocation's `dia_key` to match the feeds listed at [diadata.org/app/rwa](https://www.diadata.org/app/rwa/). Testnet oracle: `CAEDPEZDRCEJCF73ASC5JGNKCIJDV2QJQSW6DJ6B74MYALBNKCJ5IFP4`.
-
-## Build & test
+### Deploy (testnet)
 
 ```bash
-cd contracts
-cargo test -p bucket-vault        # 3 integration tests (shares math, pro-rata exit, stale-price fail-close)
-stellar contract build            # wasm output:
-# target/wasm32v1-none/release/bucket_vault.wasm
-# target/wasm32v1-none/release/share_token.wasm
+npm run build:contracts
+node scripts/deploy-stellar.mjs                 # idempotent; state in scripts/.stellar-deploy.json
+node scripts/price-updater.mjs --watch          # keep oracle feeds fresh
+# copy deploy ids into src/client/stellar/deploy.json for the UI
 ```
 
-Toolchain notes:
+### Toolchain
 
-- `soroban-sdk = "23"` matches `stellar-cli` 23.x.
-- OpenZeppelin crates are pinned to `=0.5.0` — that is the release line built against sdk 23.
-- `ed25519-dalek` is pinned `=2.2.0`; v3 resolves `rand_core` 0.10 which breaks `soroban-env-host` testutils compilation.
+- `soroban-sdk = "23"` / `wasm32v1-none`
+- OpenZeppelin `stellar-tokens` / `stellar-macros` pinned `=0.5.0`
+- `ed25519-dalek = "=2.2.0"` (testutils compatibility)
 
-## Deploy to testnet
+## Historical notes
 
-```bash
-# once per bucket: deploy a share token whose admin is the vault address
-stellar contract deploy --wasm contracts/target/wasm32v1-none/release/share_token.wasm \
-  --network testnet --source <admin> \
-  -- --constructor <vault_addr> "Tech Ten" TECH10   # or deploy then call __constructor args via CLI
-
-# deploy the vault once
-stellar contract deploy --wasm contracts/target/wasm32v1-none/release/bucket_vault.wasm \
-  --network testnet --source <admin>
-
-# initialize (USDC testnet asset addr, DIA oracle addr)
-stellar contract invoke --id <vault> --network testnet --source <admin> -- \
-  initialize --admin <admin> --usdc <usdc_addr> --usdc-key "USDC/USD" \
-  --dia-oracle CAEDPEZDRCEJCF73ASC5JGNKCIJDV2QJQSW6DJ6B74MYALBNKCJ5IFP4 \
-  --staleness-secs 300 --drift-bps 500
-
-# per bucket: register the bucket, then seed swap pools at DIA prices
-# (admin approves the vault on USDC + each RWA token first)
-# seed_pool --asset <aapl_addr> --usdc-amount 2000000000000 --asset-amount 1000000000000
-```
-
-## Not yet implemented (deliberate)
-
-- Concrete RWA token deployments → DIA-key mapping table (config, not code). Pool prices only track DIA if admin re-seeds reserves as feeds move; add a fee + external LPs if third parties ever trade against the pools.
-- Deposit fees, emergency pause, upgradeability — YAGNI until there is TVL worth pausing.
-- Security audit. Treat as MVP/hackathon-grade code.
-
-## Historical documents
-
-- [investmade_fun.md](./investmade_fun.md) — original hackathon brief (EVM-era, preserved for context).
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/USER_FLOW.md](./docs/USER_FLOW.md) — describe the previous Robinhood/Solana implementation paths kept in the repo for reference; they are not part of the default Stellar product surface.
+- [investmade_fun.md](./investmade_fun.md) — original ETHGlobal brief (EVM-era).
+- [stellar_migration.md](./stellar_migration.md) — early Stellar migration plan (partially superseded).
+- `src/server/` and `npm run dev:live` still contain the older Robinhood/Solana + Privy stack; they are **not** the default product path.

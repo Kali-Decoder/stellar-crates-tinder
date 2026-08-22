@@ -18,6 +18,8 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:contracts": "npm run build:contracts && cd contracts && CARGO_TARGET_DIR=./target cargo test --workspace",
+    "build:contracts": "cd contracts && CARGO_TARGET_DIR=./target cargo build --release --target wasm32v1-none -p share-token -p bucket-vault -p dia-oracle",
     "bench:0g": "tsx scripts/bench-0g.ts",
     "verify:0x": "node scripts/verify-0x.mjs",
     "db:migrate": "node scripts/migrate.mjs"

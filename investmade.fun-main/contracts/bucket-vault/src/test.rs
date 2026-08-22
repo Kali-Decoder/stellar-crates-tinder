@@ -211,3 +211,102 @@ fn stale_price_fails_closed() {
         other => panic!("expected StalePrice on deposit, got ok={}", other.is_ok()),
     }
 }
+
+#[test]
+fn create_bucket_rejects_bad_allocations() {
+    let s = setup();
+
+    // Empty allocations
+    let empty = vec![&s.env];
+    let res = s
+        .vault()
+        .try_create_bucket(&String::from_str(&s.env, "Empty"), &empty);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::BadAllocation.into()),
+        other => panic!("expected BadAllocation empty, got ok={}", other.is_ok()),
+    }
+
+    // Weights sum over 100%
+    let over = vec![
+        &s.env,
+        Allocation {
+            asset: s.aapl.clone(),
+            dia_key: key(&s.env, "AAPL/USD"),
+            target_bps: 6_000,
+        },
+        Allocation {
+            asset: s.nvda.clone(),
+            dia_key: key(&s.env, "NVDA/USD"),
+            target_bps: 5_000,
+        },
+    ];
+    let res = s
+        .vault()
+        .try_create_bucket(&String::from_str(&s.env, "Over"), &over);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::BadAllocation.into()),
+        other => panic!("expected BadAllocation over, got ok={}", other.is_ok()),
+    }
+
+    // Duplicate asset
+    let dup = vec![
+        &s.env,
+        Allocation {
+            asset: s.aapl.clone(),
+            dia_key: key(&s.env, "AAPL/USD"),
+            target_bps: 5_000,
+        },
+        Allocation {
+            asset: s.aapl.clone(),
+            dia_key: key(&s.env, "AAPL/USD"),
+            target_bps: 5_000,
+        },
+    ];
+    let res = s
+        .vault()
+        .try_create_bucket(&String::from_str(&s.env, "Dup"), &dup);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::BadAllocation.into()),
+        other => panic!("expected BadAllocation dup, got ok={}", other.is_ok()),
+    }
+}
+
+#[test]
+fn deposit_rejects_zero_amount() {
+    let s = setup();
+    let id = make_bucket(&s);
+    let alice = Address::generate(&s.env);
+    let res = s.vault().try_deposit(&id, &alice, &0i128);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::Overflow.into()),
+        other => panic!("expected Overflow, got ok={}", other.is_ok()),
+    }
+}
+
+#[test]
+fn double_initialize_fails() {
+    let s = setup();
+    let res = s.vault().try_initialize(
+        &s.admin,
+        &s.usdc,
+        &key(&s.env, "USDC/USD"),
+        &Address::generate(&s.env),
+        &s.env.deployer().upload_contract_wasm(SHARE_TOKEN_WASM),
+        &300,
+        &500,
+    );
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::AlreadyInitialized.into()),
+        other => panic!("expected AlreadyInitialized, got ok={}", other.is_ok()),
+    }
+}
+
+#[test]
+fn missing_bucket_fails() {
+    let s = setup();
+    let res = s.vault().try_get_bucket(&99u32);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::NoSuchBucket.into()),
+        other => panic!("expected NoSuchBucket, got ok={}", other.is_ok()),
+    }
+}

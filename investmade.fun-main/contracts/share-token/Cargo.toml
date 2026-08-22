@@ -13,3 +13,6 @@ stellar-macros = "=0.5.0"
 
 [features]
 testutils = ["soroban-sdk/testutils"]
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

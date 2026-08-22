@@ -299,7 +299,7 @@ export function MockApp() {
 						record={settlement}
 						selected={receiptCandidates.length ? receiptCandidates : selected}
 						feed={feed}
-						demoMode
+						demoMode={!settlement?.transactionHashes.some((h) => h.length > 40)}
 						onResume={async () => {
 							if (!settlement) return;
 							setSettlement(await api.reconcile(settlement.plan.executionId));

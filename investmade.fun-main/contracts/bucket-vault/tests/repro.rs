@@ -4,7 +4,7 @@
 
 use soroban_sdk::{
     testutils::Address as _,
-    vec, Address, Bytes, BytesN, Env, String, Vec,
+    vec, Address, Bytes, Env, String, Vec,
 };
 
 use bucket_vault::{BucketVaultClient, Allocation};

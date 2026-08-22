@@ -168,11 +168,31 @@ function commitment(seed: string) {
 }
 
 function fixtureAssets(includeCommunity: boolean) {
-	return Object.values(ASSET_REGISTRY).filter(
-		(asset) =>
-			Boolean(OUTPUTS[asset.symbol] && META[asset.symbol]) &&
-			(includeCommunity || !isDegenCommunityAsset(asset.assetId)),
-	);
+	const stellarFirst = [
+		"AAPL",
+		"NVDA",
+		"MSFT",
+		"TSLA",
+		"META",
+		"AMZN",
+		"GOOGL",
+		"JPM",
+		"DIS",
+		"KO",
+	];
+	return Object.values(ASSET_REGISTRY)
+		.filter(
+			(asset) =>
+				Boolean(OUTPUTS[asset.symbol] && META[asset.symbol]) &&
+				(includeCommunity || !isDegenCommunityAsset(asset.assetId)),
+		)
+		.sort((a, b) => {
+			const ai = stellarFirst.indexOf(a.symbol);
+			const bi = stellarFirst.indexOf(b.symbol);
+			const aRank = ai === -1 ? 999 : ai;
+			const bRank = bi === -1 ? 999 : bi;
+			return aRank - bRank;
+		});
 }
 
 export function buildMockCandidates(

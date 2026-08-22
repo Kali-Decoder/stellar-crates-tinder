@@ -56,11 +56,15 @@ export function ReceiptScreen({
 	const successfulLegs = record.settledOutputs.filter(
 		(output) => output.status === "success",
 	).length;
-	const chainLabel = demoMode
-		? "Stellar"
-		: record.plan.chain === "SOLANA"
-			? "Solana"
-			: "Robinhood Chain";
+	const isStellarTx = record.transactionHashes.some((hash) =>
+		/^[a-fA-F0-9]{64}$/.test(hash),
+	);
+	const chainLabel =
+		demoMode || isStellarTx
+			? "Stellar"
+			: record.plan.chain === "SOLANA"
+				? "Solana"
+				: "Robinhood Chain";
 	const providerLabel = executionProviderLabel(record.plan.provider);
 	const receiptStatus = receiptCopy(
 		record.status,
@@ -78,7 +82,7 @@ export function ReceiptScreen({
 	const isPending = record.status === "SUBMITTED";
 	const isSettled = record.status === "SETTLED";
 	const stableToken =
-		demoMode || record.plan.chain === "SOLANA" ? "USDC" : "USDG";
+		demoMode || isStellarTx || record.plan.chain === "SOLANA" ? "USDC" : "USDG";
 	const totalInput = formatUsd(
 		formatUnits(BigInt(record.plan.totalInputBaseUnits), 6),
 	);
@@ -463,6 +467,10 @@ function receiptCopy(
 }
 
 function explorerUrl(hash: string, chain: ExecutionRecord["plan"]["chain"]) {
+	// Stellar tx hashes are 64 hex chars; prefer Stellar Expert for those.
+	if (/^[a-fA-F0-9]{64}$/.test(hash)) {
+		return `https://stellar.expert/explorer/testnet/tx/${hash}`;
+	}
 	return chain === "SOLANA"
 		? `https://explorer.solana.com/tx/${hash}`
 		: `https://robinhoodchain.blockscout.com/tx/${hash}`;
