@@ -136,7 +136,7 @@ export function MockPositions({
 								iconUrl={candidate.iconUrl}
 								size="md"
 							/>
-							<div>
+							<div className="position-copy">
 								<strong>{candidate.symbol}</strong>
 								<small>{candidate.name}</small>
 							</div>

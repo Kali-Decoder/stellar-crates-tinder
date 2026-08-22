@@ -7,24 +7,24 @@ import { SwkAppLightTheme } from "@creit.tech/stellar-wallets-kit/types";
 const WALLET_ID_KEY = "swyft:stellar-wallet-id";
 const isBrowser = typeof window !== "undefined";
 
-/** Swyft.fun light theme mapped onto Stellar Wallets Kit modal tokens. */
+/** Swyft.fun theme mapped onto Stellar Wallets Kit modal tokens. */
 export const swyftSwkTheme: SwkAppTheme = {
 	...SwkAppLightTheme,
 	background: "#ffffff",
-	"background-secondary": "#f1f3f6",
-	"foreground-strong": "#090a0b",
-	foreground: "#090a0b",
-	"foreground-secondary": "#62666f",
-	primary: "#baff00",
-	"primary-foreground": "#090a0b",
+	"background-secondary": "#e8eef5",
+	"foreground-strong": "#071018",
+	foreground: "#071018",
+	"foreground-secondary": "#5c6675",
+	primary: "#1aaa84",
+	"primary-foreground": "#041018",
 	transparent: "transparent",
-	lighter: "#f8f9fb",
-	light: "#eef0f4",
-	"light-gray": "#cbd0d8",
-	gray: "#62666f",
-	danger: "#ff4d44",
-	border: "#cbd0d8",
-	shadow: "0 2px 0 rgba(8, 10, 12, 0.08)",
+	lighter: "#f4f8fc",
+	light: "#e8eef5",
+	"light-gray": "#c5ced9",
+	gray: "#5c6675",
+	danger: "#ff5c52",
+	border: "#c5ced9",
+	shadow: "0 10px 30px rgba(15, 23, 34, 0.08)",
 	"border-radius": "16px",
 	"font-family": '"DM Sans", system-ui, sans-serif',
 };

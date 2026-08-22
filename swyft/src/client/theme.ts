@@ -16,7 +16,7 @@ export function applyTheme(theme: AppTheme) {
 		'meta[name="theme-color"]',
 	);
 	if (themeColor) {
-		themeColor.content = theme === "dark" ? "#0b0e14" : "#f1f3f6";
+		themeColor.content = theme === "dark" ? "#070b11" : "#e8eef5";
 	}
 }
 
