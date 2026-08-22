@@ -61,3 +61,20 @@ fn burn_reduces_balance() {
     token.burn(&user, &200i128);
     assert_eq!(token.balance(&user), 300i128);
 }
+
+#[test]
+fn transfer_moves_balance_between_users() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let id = deploy(&e, &admin, "Basket", "SWYFT");
+    let client = ShareTokenClient::new(&e, &id);
+    let token = TokenClient::new(&e, &id);
+
+    client.mint(&alice, &1_000i128);
+    token.transfer(&alice, &bob, &400i128);
+    assert_eq!(token.balance(&alice), 600i128);
+    assert_eq!(token.balance(&bob), 400i128);
+}

@@ -72,7 +72,7 @@ Inputs:
 - `name` (≤ 64 chars)
 - `allocations[]`: `{ asset, dia_key, target_bps }`  
   - 1…20 legs, no duplicates, no USDC as allocation asset  
-  - each `target_bps > 0`, sum ≤ 10_000
+  - each `target_bps > 0`, **sum must equal 10_000** (exactly 100%)
 
 Effects:
 
@@ -113,6 +113,10 @@ Deposit logic:
 
 Users hold **shares of the basket**, not individual RWA tokens, until withdraw.
 
+View helper for the UI:
+
+- `preview_withdraw(bucket_id, shares) → Map<asset, amount>` — pro-rata AAPL/NVDA/USDC claim **without** moving funds.
+
 ```mermaid
 sequenceDiagram
   participant U as User
@@ -123,10 +127,10 @@ sequenceDiagram
 
   U->>USDC: approve(vault, amount)
   U->>V: deposit(bucket_id, from, amount)
-  V->>USDC: transfer_from(user → vault)
   V->>O: read_oracle_value(USDC/USD)
   O-->>V: price, timestamp
-  V->>V: compute shares from NAV
+  V->>V: compute shares from pre-deposit NAV
+  V->>USDC: transfer_from(user → vault)
   V->>S: mint(user, shares)
   V-->>U: shares minted
 ```
@@ -192,7 +196,7 @@ Decimals:
 1. **Fail closed on price** — no deposit / NAV / rebalance with missing or stale feeds.
 2. **Shares priced on pre-deposit NAV** — depositor cannot dilute themselves upward in the same call.
 3. **Vault is sole minter** of each bucket’s share token.
-4. **Allocation bps** — sum ≤ 100%; no USDC-as-asset; no duplicates.
+4. **Allocation bps** — sum **exactly** 100%; no USDC-as-asset; no duplicates.
 5. **Rebalance** is permissionless but bounded by deadline, slippage cap, and `min_outs`.
 6. **No upgrade path** on vault config — redeploy to change params.
 

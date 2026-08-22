@@ -67,3 +67,17 @@ fn overwrite_price_updates_value() {
     client.set_prices(&vec![&e, key.clone()], &vec![&e, OracleValue(200, 20)]);
     assert_eq!(client.read_oracle_value(&key), OracleValue(200, 20));
 }
+
+#[test]
+fn empty_batch_is_noop() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let id = e.register(DiaOracle, (&admin,));
+    let client = DiaOracleClient::new(&e, &id);
+    let keys: Vec<String> = vec![&e];
+    let values = vec![&e];
+    client.set_prices(&keys, &values);
+    let nope: String = "AAPL/USD".into_val(&e);
+    assert_eq!(client.read_oracle_value(&nope), OracleValue(0, 0));
+}

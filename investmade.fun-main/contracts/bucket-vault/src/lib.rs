@@ -165,20 +165,21 @@ impl BucketVault {
                     panic_with_error!(e, VaultError::BadAllocation);
                 }
             }
-            sum_bps += a.target_bps;
+            sum_bps = sum_bps
+                .checked_add(a.target_bps)
+                .unwrap_or_else(|| panic_with_error!(e, VaultError::BadAllocation));
         }
-        if sum_bps > 10_000 {
+        // Exact 100% so targets are unambiguous for rebalance + UI claim math.
+        if sum_bps != 10_000 {
             panic_with_error!(e, VaultError::BadAllocation);
         }
 
         let id = e.storage().instance().get::<_, u32>(&DataKey::NextBucketId).unwrap_or(0);
         e.storage().instance().set(&DataKey::NextBucketId, &(id + 1));
-        e.events().publish((symbol_short!("dbgid"),), id);
 
-        // ponytail: fixed symbol; name carries the identity.
+        // Fixed symbol; name carries the identity.
         let symbol = String::from_str(e, "SWYFT");
         let salt: BytesN<32> = e.prng().gen();
-        e.events().publish((symbol_short!("dbgpre"),), id);
         let share_token = e
             .deployer()
             .with_current_contract(salt)
@@ -186,10 +187,14 @@ impl BucketVault {
                 cfg.share_token_wasm,
                 (e.current_contract_address(), name.clone(), symbol),
             );
-        e.events().publish((symbol_short!("dbgpost"), (id,)), share_token.clone());
 
         let bucket = Bucket { id, name, allocations, share_token };
         e.storage().persistent().set(&DataKey::Bucket(id), &bucket);
+        e.storage().persistent().extend_ttl(
+            &DataKey::Bucket(id),
+            INSTANCE_TTL_THRESHOLD,
+            INSTANCE_TTL_BUMP,
+        );
         Self::save_balances(e, id, &Map::new(e));
         e.events().publish((symbol_short!("created"), id), bucket.name);
         id
@@ -205,6 +210,24 @@ impl BucketVault {
         let cfg = Self::config(e);
         let bucket = Self::bucket(e, bucket_id);
 
+        // Compute shares against pre-deposit NAV before moving funds so a
+        // dust/zero mint cannot strand USDC in the vault.
+        let supply = ShareTokenClient::new(e, &bucket.share_token).total_supply();
+        let dep_price = dia::fresh_price(e, &cfg.dia_oracle, &cfg.usdc_key, cfg.staleness_secs);
+        let dep_usd = Self::usd_value(e, &cfg.usdc, amount, dep_price);
+        let shares = if supply == 0 {
+            dep_usd
+        } else {
+            let pre_nav = Self::nav(e, &cfg, bucket_id).1;
+            if pre_nav <= 0 {
+                panic_with_error!(e, VaultError::Overflow);
+            }
+            ((dep_usd as u128) * (supply as u128) / (pre_nav as u128)) as i128
+        };
+        if shares <= 0 {
+            panic_with_error!(e, VaultError::Overflow);
+        }
+
         TokenClient::new(e, &cfg.usdc).transfer_from(
             &e.current_contract_address(),
             &from,
@@ -212,22 +235,9 @@ impl BucketVault {
             &amount,
         );
 
-        // Price against pre-deposit NAV: this deposit must not inflate its
-        // own denominator.
-        let supply = ShareTokenClient::new(e, &bucket.share_token).total_supply();
-        let dep_price = dia::fresh_price(e, &cfg.dia_oracle, &cfg.usdc_key, cfg.staleness_secs);
-        let dep_usd = Self::usd_value(e, &cfg.usdc, amount, dep_price);
-        let pre_nav = if supply == 0 { 0 } else { Self::nav(e, &cfg, bucket_id).1 };
-
         let mut b = Self::balances(e, bucket_id);
         b.set(cfg.usdc.clone(), b.get(cfg.usdc.clone()).unwrap_or(0) + amount);
         Self::save_balances(e, bucket_id, &b);
-
-        let shares = if supply == 0 {
-            dep_usd // share token has 8 decimals == PRICE_SCALE
-        } else {
-            ((dep_usd as u128) * (supply as u128) / (pre_nav as u128)) as i128
-        };
 
         ShareTokenClient::new(e, &bucket.share_token)
             .mint(&from, &shares);
@@ -254,19 +264,16 @@ impl BucketVault {
 
         let (mut b, _total) = Self::nav(e, &cfg, bucket_id);
         let self_addr = e.current_contract_address();
+        let out_map = Self::pro_rata_slice(e, &b, shares, supply);
 
         // Effects before interactions: burn, update ledger, then pay out.
         ShareTokenClient::new(e, &bucket.share_token)
             .burn_from(&self_addr.clone(), &user, &shares);
 
-        let mut out_map = Map::new(e);
-        for k in b.keys() {
+        for k in out_map.keys() {
+            let out = out_map.get(k.clone()).unwrap();
             let held = b.get(k.clone()).unwrap_or(0);
-            let out = ((held as u128) * (shares as u128) / (supply as u128)) as i128;
-            if out > 0 {
-                b.set(k.clone(), held - out);
-                out_map.set(k, out);
-            }
+            b.set(k.clone(), held - out);
         }
         Self::save_balances(e, bucket_id, &b);
 
@@ -389,7 +396,34 @@ impl BucketVault {
         Self::nav(e, &Self::config(e), bucket_id).1
     }
 
+    /// Pro-rata token amounts a share balance would receive on withdraw.
+    /// Does not move funds — UI uses this to show implied AAPL/NVDA/USDC claim.
+    pub fn preview_withdraw(e: &Env, bucket_id: u32, shares: i128) -> Map<Address, i128> {
+        if shares <= 0 {
+            panic_with_error!(e, VaultError::InsufficientShares);
+        }
+        let bucket = Self::bucket(e, bucket_id);
+        let supply = ShareTokenClient::new(e, &bucket.share_token).total_supply();
+        if supply == 0 || shares > supply {
+            panic_with_error!(e, VaultError::InsufficientShares);
+        }
+        let b = Self::balances(e, bucket_id);
+        Self::pro_rata_slice(e, &b, shares, supply)
+    }
+
     // ---------- internals ----------
+
+    fn pro_rata_slice(e: &Env, b: &Map<Address, i128>, shares: i128, supply: i128) -> Map<Address, i128> {
+        let mut out_map = Map::new(e);
+        for k in b.keys() {
+            let held = b.get(k.clone()).unwrap_or(0);
+            let out = ((held as u128) * (shares as u128) / (supply as u128)) as i128;
+            if out > 0 {
+                out_map.set(k, out);
+            }
+        }
+        out_map
+    }
 
     fn pool_get(e: &Env, asset: &Address) -> Pool {
         e.storage()

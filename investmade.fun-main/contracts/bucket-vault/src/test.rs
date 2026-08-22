@@ -46,6 +46,7 @@ struct Setup {
     env: Env,
     admin: Address,
     vault_addr: Address,
+    oracle: Address,
     usdc: Address,
     aapl: Address,
     nvda: Address,
@@ -98,7 +99,7 @@ fn setup() -> Setup {
     vault.seed_pool(&aapl, &2_000_000_000_000i128, &1_000_000_000_000i128);
     vault.seed_pool(&nvda, &1_000_000_000_000i128, &1_000_000_000_000i128);
 
-    Setup { env, admin, vault_addr, usdc, aapl, nvda }
+    Setup { env, admin, vault_addr, oracle, usdc, aapl, nvda }
 }
 
 fn make_bucket(s: &Setup) -> u32 {
@@ -269,6 +270,45 @@ fn create_bucket_rejects_bad_allocations() {
         Err(Ok(err)) => assert_eq!(err, VaultError::BadAllocation.into()),
         other => panic!("expected BadAllocation dup, got ok={}", other.is_ok()),
     }
+
+    // Under-weight (must be exactly 100%)
+    let under = vec![
+        &s.env,
+        Allocation {
+            asset: s.aapl.clone(),
+            dia_key: key(&s.env, "AAPL/USD"),
+            target_bps: 4_000,
+        },
+        Allocation {
+            asset: s.nvda.clone(),
+            dia_key: key(&s.env, "NVDA/USD"),
+            target_bps: 4_000,
+        },
+    ];
+    let res = s
+        .vault()
+        .try_create_bucket(&String::from_str(&s.env, "Under"), &under);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::BadAllocation.into()),
+        other => panic!("expected BadAllocation under, got ok={}", other.is_ok()),
+    }
+
+    // USDC cannot be an allocation asset
+    let usdc_leg = vec![
+        &s.env,
+        Allocation {
+            asset: s.usdc.clone(),
+            dia_key: key(&s.env, "USDC/USD"),
+            target_bps: 10_000,
+        },
+    ];
+    let res = s
+        .vault()
+        .try_create_bucket(&String::from_str(&s.env, "Usdc"), &usdc_leg);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::BadAllocation.into()),
+        other => panic!("expected BadAllocation usdc, got ok={}", other.is_ok()),
+    }
 }
 
 #[test]
@@ -309,4 +349,132 @@ fn missing_bucket_fails() {
         Err(Ok(err)) => assert_eq!(err, VaultError::NoSuchBucket.into()),
         other => panic!("expected NoSuchBucket, got ok={}", other.is_ok()),
     }
+}
+
+#[test]
+fn preview_withdraw_shows_pro_rata_claims() {
+    let s = setup();
+    let id = make_bucket(&s);
+    let alice = Address::generate(&s.env);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&alice, &100_000_000i128); // 10 USDC
+    TokenClient::new(&s.env, &s.usdc).approve(&alice, &s.vault_addr, &100_000_000i128, &1000);
+    let shares = s.vault().deposit(&id, &alice, &100_000_000i128);
+
+    // Pre-rebalance: claim is idle USDC only.
+    let pre = s.vault().preview_withdraw(&id, &shares);
+    assert_eq!(pre.get(s.usdc.clone()).unwrap_or(0), 100_000_000i128);
+    assert_eq!(pre.get(s.aapl.clone()).unwrap_or(0), 0);
+    assert_eq!(pre.get(s.nvda.clone()).unwrap_or(0), 0);
+
+    s.vault().rebalance(
+        &id,
+        &(TS + 3600),
+        &50,
+        &vec![&s.env, 20_000_000i128, 30_000_000i128],
+    );
+
+    let post = s.vault().preview_withdraw(&id, &shares);
+    assert!(post.get(s.aapl.clone()).unwrap_or(0) > 0, "aapl claim");
+    assert!(post.get(s.nvda.clone()).unwrap_or(0) > 0, "nvda claim");
+}
+
+#[test]
+fn partial_withdraw_splits_fairly_between_depositors() {
+    let s = setup();
+    let id = make_bucket(&s);
+
+    let alice = Address::generate(&s.env);
+    let bob = Address::generate(&s.env);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&alice, &600_000_000i128); // 60
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&bob, &400_000_000i128); // 40
+    TokenClient::new(&s.env, &s.usdc).approve(&alice, &s.vault_addr, &600_000_000i128, &1000);
+    TokenClient::new(&s.env, &s.usdc).approve(&bob, &s.vault_addr, &400_000_000i128, &1000);
+
+    let alice_shares = s.vault().deposit(&id, &alice, &600_000_000i128);
+    let bob_shares = s.vault().deposit(&id, &bob, &400_000_000i128);
+    assert_eq!(alice_shares, 6_000_000_000i128);
+    assert_eq!(bob_shares, 4_000_000_000i128);
+
+    // Alice withdraws half her shares while still USDC-only.
+    let half = alice_shares / 2;
+    let share_token = s.vault().get_bucket(&id).share_token;
+    TokenClient::new(&s.env, &share_token).approve(&alice, &s.vault_addr, &half, &1000);
+    let usdc_before = TokenClient::new(&s.env, &s.usdc).balance(&alice);
+    s.vault().withdraw(&id, &alice, &half);
+    let usdc_after = TokenClient::new(&s.env, &s.usdc).balance(&alice);
+    assert_eq!(usdc_after - usdc_before, 300_000_000i128); // half of 60
+
+    let remaining = s.vault().holdings(&id).get(s.usdc.clone()).unwrap_or(0);
+    assert_eq!(remaining, 700_000_000i128); // 40 bob + 30 alice left
+}
+
+#[test]
+fn rebalance_rejects_past_deadline() {
+    let s = setup();
+    let id = make_bucket(&s);
+    let alice = Address::generate(&s.env);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&alice, &100_000_000i128);
+    TokenClient::new(&s.env, &s.usdc).approve(&alice, &s.vault_addr, &100_000_000i128, &1000);
+    s.vault().deposit(&id, &alice, &100_000_000i128);
+
+    let res = s.vault().try_rebalance(
+        &id,
+        &(TS - 1),
+        &50,
+        &vec![&s.env, 1i128, 1i128],
+    );
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::DeadlinePassed.into()),
+        other => panic!("expected DeadlinePassed, got ok={}", other.is_ok()),
+    }
+}
+
+#[test]
+fn rebalance_rejects_bad_min_outs_len() {
+    let s = setup();
+    let id = make_bucket(&s);
+    let res = s.vault().try_rebalance(
+        &id,
+        &(TS + 3600),
+        &50,
+        &vec![&s.env, 1i128], // need 2
+    );
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::BadMinOuts.into()),
+        other => panic!("expected BadMinOuts, got ok={}", other.is_ok()),
+    }
+}
+
+#[test]
+fn missing_usdc_price_fails_deposit() {
+    let s = setup();
+    let id = make_bucket(&s);
+    // Wipe USDC feed -> (0,0) => NoPrice
+    MockOracleClient::new(&s.env, &s.oracle).set(&key(&s.env, "USDC/USD"), &0u128, &TS);
+
+    let alice = Address::generate(&s.env);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&alice, &100_000_000i128);
+    TokenClient::new(&s.env, &s.usdc).approve(&alice, &s.vault_addr, &100_000_000i128, &1000);
+    let res = s.vault().try_deposit(&id, &alice, &100_000_000i128);
+    match res {
+        Err(Ok(err)) => assert_eq!(err, VaultError::NoPrice.into()),
+        other => panic!("expected NoPrice, got ok={}", other.is_ok()),
+    }
+}
+
+#[test]
+fn second_depositor_mints_pro_rata_at_nav() {
+    let s = setup();
+    let id = make_bucket(&s);
+    let alice = Address::generate(&s.env);
+    let bob = Address::generate(&s.env);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&alice, &100_000_000i128);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&bob, &100_000_000i128);
+    TokenClient::new(&s.env, &s.usdc).approve(&alice, &s.vault_addr, &100_000_000i128, &1000);
+    TokenClient::new(&s.env, &s.usdc).approve(&bob, &s.vault_addr, &100_000_000i128, &1000);
+
+    assert_eq!(s.vault().deposit(&id, &alice, &100_000_000i128), 1_000_000_000i128);
+    // Same NAV → same $ deposit → same shares
+    assert_eq!(s.vault().deposit(&id, &bob, &100_000_000i128), 1_000_000_000i128);
+    assert_eq!(s.vault().portfolio_value(&id), 2_000_000_000i128);
 }

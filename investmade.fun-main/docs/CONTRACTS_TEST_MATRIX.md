@@ -16,9 +16,10 @@ Automated gate last verified: update when you re-run.
 | Shares | burn reduces balance | `burn_reduces_balance` | Pass |
 | Vault | deposit, NAV, rebalance holdings | `deposit_shares_nav_rebalance` | Pass |
 | Vault | withdraw burns + pro-rata assets | `withdraw_pays_pro_rata_slice_and_burns` | Pass |
-| Vault | stale oracle fails deposit/NAV | `stale_price_fails_closed` | Pass |
-| Vault | bad alloc / zero deposit / double init / missing bucket | unit tests in `bucket-vault/src/test.rs` | Pass |
-| Vault | create_bucket with real share wasm | `tests/repro.rs` | Pass |
+| Vault | preview_withdraw AAPL/NVDA claim | `preview_withdraw_shows_pro_rata_claims` | Pass |
+| Vault | partial withdraw fair split | `partial_withdraw_splits_fairly_between_depositors` | Pass |
+| Vault | stale / missing price fail closed | `stale_price_fails_closed`, `missing_usdc_price_fails_deposit` | Pass |
+| Vault | bad alloc / deadline / min_outs | unit tests in `bucket-vault/src/test.rs` | Pass |
 
 ```bash
 npm run test:contracts
