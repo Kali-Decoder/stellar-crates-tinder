@@ -1,5 +1,12 @@
 import { CircleHelp } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { visibleAssetTags } from "../../domain/asset-tag-config";
 import type { Candidate } from "../../domain/schemas";
 import {
@@ -67,15 +74,26 @@ function formatCount(value: number | undefined) {
 
 function ChartShape({
 	points,
+	prices,
+	timestamps,
 	label,
+	isDown,
+	onScrub,
 }: {
 	points: ChartPoint[];
+	prices: number[];
+	timestamps: number[];
 	label: string;
+	isDown: boolean;
+	onScrub: (payload: { price: number; timestamp: number } | null) => void;
 }) {
 	const polygonRef = useRef<SVGPolygonElement>(null);
 	const lineRef = useRef<SVGPolylineElement>(null);
 	const frameRef = useRef<number | undefined>(undefined);
 	const currentPointsRef = useRef(points);
+	const plotRef = useRef<HTMLDivElement>(null);
+	const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+	const gradientId = useId().replace(/:/g, "");
 
 	useLayoutEffect(() => {
 		const polygon = polygonRef.current;
@@ -120,31 +138,113 @@ function ChartShape({
 		};
 	}, [points]);
 
+	const tip = points.at(-1);
+	const scrubPoint =
+		scrubIndex !== null ? (points[scrubIndex] ?? tip) : undefined;
 	const line = chartPointsAttribute(points);
+
+	function indexFromClientX(clientX: number) {
+		const el = plotRef.current;
+		if (!el || !points.length) return null;
+		const rect = el.getBoundingClientRect();
+		const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+		return Math.round(xPct * (points.length - 1));
+	}
+
+	function handlePointer(clientX: number) {
+		const index = indexFromClientX(clientX);
+		if (index === null) return;
+		setScrubIndex(index);
+		const price = prices[index];
+		const timestamp = timestamps[index];
+		if (price !== undefined && timestamp !== undefined) {
+			onScrub({ price, timestamp });
+		}
+	}
+
+	function clearScrub() {
+		setScrubIndex(null);
+		onScrub(null);
+	}
+
 	return (
-		<svg
-			viewBox="0 0 100 32"
-			preserveAspectRatio="none"
-			role="img"
-			aria-label={label}
+		<div
+			ref={plotRef}
+			className="chart-plot-surface"
+			onPointerDown={(event) => {
+				event.stopPropagation();
+				event.currentTarget.setPointerCapture(event.pointerId);
+				handlePointer(event.clientX);
+			}}
+			onPointerMove={(event) => {
+				handlePointer(event.clientX);
+			}}
+			onPointerUp={clearScrub}
+			onPointerCancel={clearScrub}
+			onPointerLeave={clearScrub}
 		>
-			{CHART_TICK_Y.map((y) => (
-				<line
-					className="chart-gridline"
-					x1="0"
-					x2="100"
-					y1={y}
-					y2={y}
-					key={y}
-				/>
-			))}
-			{line ? (
-				<>
-					<polygon ref={polygonRef} points={chartPolygonAttribute(points)} />
-					<polyline ref={lineRef} points={line} />
-				</>
-			) : null}
-		</svg>
+			<svg
+				viewBox="0 0 100 32"
+				preserveAspectRatio="none"
+				role="img"
+				aria-label={label}
+				className={isDown ? "is-down" : "is-up"}
+			>
+				<title>{label}</title>
+				<defs>
+					<linearGradient id={`fill-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+						<stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+						<stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+					</linearGradient>
+				</defs>
+				{CHART_TICK_Y.map((y) => (
+					<line
+						className="chart-gridline"
+						x1="0"
+						x2="100"
+						y1={y}
+						y2={y}
+						key={y}
+					/>
+				))}
+				{line ? (
+					<>
+						<polygon
+							ref={polygonRef}
+							className="chart-area"
+							points={chartPolygonAttribute(points)}
+							fill={`url(#fill-${gradientId})`}
+						/>
+						<polyline ref={lineRef} className="chart-line" points={line} />
+						{tip ? (
+							<circle
+								className="chart-tip"
+								cx={tip.x}
+								cy={tip.y}
+								r="1.35"
+							/>
+						) : null}
+						{scrubPoint ? (
+							<>
+								<line
+									className="chart-scrub-line"
+									x1={scrubPoint.x}
+									x2={scrubPoint.x}
+									y1="0"
+									y2="32"
+								/>
+								<circle
+									className="chart-scrub-dot"
+									cx={scrubPoint.x}
+									cy={scrubPoint.y}
+									r="1.6"
+								/>
+							</>
+						) : null}
+					</>
+				) : null}
+			</svg>
+		</div>
 	);
 }
 
@@ -166,6 +266,10 @@ function PriceSparkline({
 	const [retryCount, setRetryCount] = useState(0);
 	const [details, setDetails] = useState<AssetDetailsResponse>();
 	const [detailsFailed, setDetailsFailed] = useState(false);
+	const [scrub, setScrub] = useState<{
+		price: number;
+		timestamp: number;
+	} | null>(null);
 
 	useEffect(() => {
 		if (!infoOpen || details || detailsFailed) return;
@@ -227,16 +331,21 @@ function PriceSparkline({
 		() => history?.points.map((point) => point.price) ?? [],
 		[history],
 	);
+	const timestamps = useMemo(
+		() => history?.points.map((point) => point.timestamp) ?? [],
+		[history],
+	);
 	const chartPoints = useMemo(() => chartPointsFromPrices(prices), [prices]);
 	const priceTicks = useMemo(() => chartPriceTicks(prices), [prices]);
 	const first = prices[0];
 	const last = prices.at(-1);
+	const displayPrice = scrub?.price ?? last ?? candidate.marketPriceUsd ?? 0;
 	const change = first && last ? ((last - first) / first) * 100 : 0;
 	const dateLabels = chartDateLabels(history);
 	const coverageSpan = historySpanSeconds(coverageHistory);
 	const coverageDays = Math.max(1, Math.round(coverageSpan / (24 * 60 * 60)));
 	const isNewToken =
-		coverageHistory?.source === "coingecko" &&
+		coverageHistory?.source === "dia" &&
 		coverageSpan < HISTORY_PERIOD_SECONDS["1M"];
 	const firstTimestamp = coverageHistory?.points[0]?.timestamp;
 	const oneMonthUnlock = firstTimestamp
@@ -250,6 +359,16 @@ function PriceSparkline({
 	const chartLabel = `${candidate.symbol} ${periodLabel} price chart`;
 	const loading = history === undefined;
 	const unavailable = history?.source === "unavailable";
+	const isDown = change < 0;
+	const scrubDate =
+		scrub !== null
+			? new Intl.DateTimeFormat("en-US", {
+					month: "short",
+					day: "numeric",
+					hour: period === "1H" || period === "1D" ? "numeric" : undefined,
+					minute: period === "1H" || period === "1D" ? "2-digit" : undefined,
+				}).format(new Date(scrub.timestamp * 1000))
+			: null;
 	const compactCommunityLinks = details
 		? ["X", "Telegram"].flatMap((label) => {
 				const item = details.community.find(
@@ -268,16 +387,25 @@ function PriceSparkline({
 		return () => window.clearTimeout(timer);
 	}, [retryCount, unavailable]);
 
+	useEffect(() => {
+		setScrub(null);
+	}, [candidate.assetId, period]);
+
 	return (
 		<div
-			className={`price-chart${change < 0 ? " is-down" : ""}${infoOpen ? " has-info" : ""}`}
+			className={`price-chart${isDown ? " is-down" : " is-up"}${infoOpen ? " has-info" : ""}${scrub ? " is-scrubbing" : ""}`}
 		>
 			<div className={`chart-meta${isNewToken ? " has-coverage" : ""}`}>
-				<strong>{formatUsdPrice(candidate.marketPriceUsd ?? 0)}</strong>
-				<span>
-					{prices.length
-						? `${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${periodLabel}`
-						: "—"}
+				<strong>{formatUsdPrice(displayPrice)}</strong>
+				<span className={isDown ? "is-down" : "is-up"}>
+					{scrubDate
+						? scrubDate
+						: prices.length
+							? `${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${periodLabel}`
+							: "—"}
+					{!scrubDate && history?.source === "dia" ? (
+						<em className="chart-source">DIA</em>
+					) : null}
 				</span>
 				{isNewToken ? (
 					<div className="chart-coverage">
@@ -289,7 +417,7 @@ function PriceSparkline({
 			{unavailable ? (
 				<div className="chart-unavailable" role="status">
 					<strong>Price history unavailable</strong>
-					<span>CoinGecko market data is temporarily unavailable.</span>
+					<span>DIA market data is temporarily unavailable.</span>
 					<button
 						type="button"
 						onClick={() => setRetryCount((count) => count + 1)}
@@ -320,13 +448,19 @@ function PriceSparkline({
 					>
 						<span>&nbsp;</span>
 						<span>&nbsp;</span>
-						<span>&nbsp;</span>
 					</div>
 				</>
 			) : (
 				<>
 					<div className="chart-plot">
-						<ChartShape points={chartPoints} label={chartLabel} />
+						<ChartShape
+							points={chartPoints}
+							prices={prices}
+							timestamps={timestamps}
+							label={chartLabel}
+							isDown={isDown}
+							onScrub={setScrub}
+						/>
 						<div className="chart-prices" aria-hidden="true">
 							{CHART_TICK_Y.map((y, index) => (
 								<span style={{ top: `${(y / 32) * 100}%` }} key={y}>
@@ -351,6 +485,7 @@ function PriceSparkline({
 					) : null}
 				</>
 			)}
+			<p className="chart-hint">Hold &amp; drag to scrub · DIA live spot</p>
 			<div className="chart-controls">
 				<fieldset
 					className="chart-timeframes"
@@ -390,7 +525,7 @@ function PriceSparkline({
 			{infoOpen ? (
 				<div className="asset-info-panel" aria-live="polite">
 					{!details && !detailsFailed ? (
-						<p className="asset-info-status">Loading CoinGecko details…</p>
+						<p className="asset-info-status">Loading asset details…</p>
 					) : null}
 					{detailsFailed ? (
 						<p className="asset-info-status">Asset details are unavailable.</p>

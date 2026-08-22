@@ -34,6 +34,10 @@ import {
 	settleMockExecution,
 } from "./data";
 import { MOCK_WALLET } from "./enabled";
+import {
+	enrichCandidatesWithDiaPrices,
+	fetchDiaAssetHistory,
+} from "../stellar/dia-api";
 
 type MockApi = {
 	config: () => Promise<PublicConfig>;
@@ -147,9 +151,12 @@ export function createMockApi(): MockApi {
 			await delay(40);
 			return buildMockDetails(assetId);
 		},
-		async assetHistory(assetId, period = "1W") {
-			await delay(40);
-			return { ...buildMockHistory(assetId), period, requestedPeriod: period };
+		async assetHistory(assetId, period = "1W", refresh = false) {
+			try {
+				return await fetchDiaAssetHistory(assetId, period, refresh);
+			} catch {
+				return { ...buildMockHistory(assetId), period, requestedPeriod: period };
+			}
 		},
 		async usdgBalance() {
 			await delay(40);
@@ -191,9 +198,11 @@ export function createMockApi(): MockApi {
 			const session = requireSession(sessionId);
 			state.preferences = preferences;
 			const feed = buildMockFeed(session, preferences, excludedAssetIds);
-			state.feeds.set(sessionId, feed);
-			state.lastCandidates = feed.candidates;
-			return feed;
+			const candidates = await enrichCandidatesWithDiaPrices(feed.candidates);
+			const enriched = { ...feed, candidates };
+			state.feeds.set(sessionId, enriched);
+			state.lastCandidates = enriched.candidates;
+			return enriched;
 		},
 		async prepareExecution(
 			sessionId,

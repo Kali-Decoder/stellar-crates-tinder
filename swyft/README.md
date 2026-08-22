@@ -25,7 +25,7 @@ Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit
 | Path | What it is |
 |---|---|
 | `src/client/` | React/Vite UI — landing → Freighter → plan → swipe → review → portfolio |
-| `src/client/stellar/` | Kit, RPC invoke helpers, vault invest path, deploy config |
+| `src/client/stellar/` | Kit, RPC, vault invest, **DIA RWA charts/spot** (`dia-api.ts`) |
 | `src/client/mock/` | Default product surface (no Privy/Express required) |
 | `src/domain/` | Shared schemas, budgets, tags, policy helpers |
 | `contracts/` | Soroban workspace: `bucket-vault`, `share-token`, `dia-oracle` |

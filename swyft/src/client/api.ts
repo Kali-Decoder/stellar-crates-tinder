@@ -108,7 +108,7 @@ export interface AssetIconsResponse {
 
 export interface AssetHistoryResponse {
 	period: HistoryPeriod;
-	source: "coingecko" | "nasdaq" | "yahoo" | "demo" | "unavailable";
+	source: "coingecko" | "nasdaq" | "yahoo" | "dia" | "demo" | "unavailable";
 	points: Array<{ timestamp: number; price: number }>;
 	requestedPeriod?: HistoryPeriod;
 	effectivePeriod?: HistoryPeriod | "MAX" | "LIMITED";

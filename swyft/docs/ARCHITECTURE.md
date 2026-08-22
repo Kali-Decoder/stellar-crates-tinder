@@ -34,6 +34,7 @@ flowchart TB
 | `src/client/stellar/useStellarWallet.ts` | Connect / disconnect / address |
 | `src/client/stellar/config.ts` | Deploy addresses from `deploy.json` |
 | `src/client/stellar/rpc.ts` | Simulate → assemble → Freighter sign → submit → wait |
+| `src/client/stellar/dia-api.ts` | DIA RWA REST spot + chart series for swipe cards |
 | `src/client/stellar/vault.ts` | `create_bucket` / `approve` / `deposit` / `investBasket` |
 | `src/client/mock/MockReview.tsx` | Review UI; **Invest on Stellar** or **Simulate only** |
 
