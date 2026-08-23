@@ -1,8 +1,30 @@
-import { ChevronDown, HandCoins, LoaderCircle, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+	ArrowDownToLine,
+	ChevronDown,
+	HandCoins,
+	LoaderCircle,
+	RefreshCw,
+	Scale,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AssetMark } from "../components/AssetMark";
+import { stellarConfig, USDC_DECIMALS } from "../stellar/config";
+import {
+	approveShareSpending,
+	getBucket,
+	getLatestLedger,
+	planRebalance,
+	type RebalancePlan,
+	readShareBalance,
+	readShareSupply,
+	rebalanceBucket,
+	withdrawShares,
+	previewWithdraw,
+} from "../stellar/vault";
+import { recordBasketRebalance, recordBasketWithdraw } from "../stellar/portfolio-api";
 import {
 	getWalletPortfolio,
+	type StellarBasketRecord,
 	type WalletPortfolioPayload,
 } from "../stellar/portfolio-api";
 import { buildDemoPortfolio } from "./mock-portfolio-fixtures";
@@ -91,6 +113,14 @@ export function MockPositions({
 	function toggleBasket(id: string) {
 		setExpandedId((current) => (current === id ? null : id));
 	}
+
+	const liveBaskets = useMemo(
+		() =>
+			baskets.filter(
+				(b) => b.vaultAddress === stellarConfig.vault && b.bucketId > 0,
+			),
+		[baskets],
+	);
 
 	return (
 		<main className="positions-page">
@@ -197,8 +227,7 @@ export function MockPositions({
 							className={`basket-card${open ? " is-open" : ""}${positive ? " is-up" : " is-down"}`}
 							key={basket.id}
 							role="listitem"
-						>
-							<button
+						>							<button
 								type="button"
 								className="basket-card-toggle"
 								aria-expanded={open}
@@ -287,6 +316,13 @@ export function MockPositions({
 										))}
 									</ul>
 									<p className="basket-card-note">{basket.pnl.note}</p>
+									{liveBaskets.some((b) => b.id === basket.id) && wallet ? (
+										<BasketActions
+											basket={basket}
+											wallet={wallet}
+											onDone={() => setReloadKey((value) => value + 1)}
+										/>
+									) : null}
 								</div>
 							) : null}
 						</article>
@@ -295,4 +331,257 @@ export function MockPositions({
 			</div>
 		</main>
 	);
+}
+
+const WITHDRAW_PCTS = [25, 50, 100];
+
+/** Withdraw + rebalance controls for a live on-chain basket. */
+function BasketActions({
+	basket,
+	wallet,
+	onDone,
+}: {
+	basket: StellarBasketRecord & { pnl: { currentNavUsd: number } };
+	wallet: string;
+	onDone: () => void;
+}) {
+	const [shareBalance, setShareBalance] = useState<bigint>();
+	const [shareToken, setShareToken] = useState<string>();
+	const [supply, setSupply] = useState<bigint>();
+	const [plan, setPlan] = useState<RebalancePlan>();
+	const [loading, setLoading] = useState(true);
+	const [pct, setPct] = useState<number>(100);
+	const [preview, setPreview] = useState<Record<string, string>>({});
+	const [busy, setBusy] = useState<"" | "withdraw" | "rebalance">("");
+	const [statusLine, setStatusLine] = useState("");
+	const [error, setError] = useState("");
+
+	const loadChain = useCallback(async () => {
+		setLoading(true);
+		setError("");
+		try {
+			const bucket = await getBucket(basket.bucketId);
+			setShareToken(bucket.shareToken);
+			const [balance, totalSupply] = await Promise.all([
+				readShareBalance(bucket.shareToken, wallet),
+				readShareSupply(bucket.shareToken),
+			]);
+			setShareBalance(balance);
+			setSupply(totalSupply);
+			setPreview({});
+		} catch (caught) {
+			setError(caught instanceof Error ? caught.message : "Bucket not found on-chain.");
+		} finally {
+			setLoading(false);
+		}
+	}, [basket.bucketId, wallet]);
+
+	useEffect(() => {
+		void loadChain();
+		void planRebalance(basket.bucketId)
+			.then(setPlan)
+			.catch(() => setPlan(undefined));
+	}, [loadChain, basket.bucketId]);
+
+	useEffect(() => {
+		if (!shareBalance || !supply || shareBalance === 0n) return;
+		let cancelled = false;
+		const shares = (shareBalance * BigInt(pct)) / 100n;
+		void (async () => {
+			try {
+				const out = await previewWithdraw(basket.bucketId, shares);
+				if (cancelled) return;
+				const symbolByAsset = new Map(
+					basket.allocations.map((leg) => [leg.asset, leg.symbol]),
+				);
+				setPreview(
+					Object.fromEntries(
+						Object.entries(out)
+							.filter(([, amount]) => amount > 0n)
+							.map(([asset, amount]) => [
+								symbolByAsset.get(asset) ?? "USDC",
+								formatBase(amount, asset === stellarConfig.usdc ? USDC_DECIMALS : 8),
+							]),
+					),
+				);
+			} catch {
+				if (!cancelled) setPreview({});
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [basket.allocations, basket.bucketId, pct, shareBalance, supply]);
+
+	async function confirmWithdraw() {
+		if (!shareBalance || !shareToken || busy) return;
+		const shares = (shareBalance * BigInt(pct)) / 100n;
+		if (shares <= 0n) return;
+		setBusy("withdraw");
+		setError("");
+		try {
+			setStatusLine("Approving share burn — sign in Freighter…");
+			const ledger = await getLatestLedger();
+			await approveShareSpending({
+				source: wallet,
+				shareToken,
+				amount: shares,
+				expirationLedger: ledger + 2_000,
+			});
+			setStatusLine(`Withdrawing ${pct}% — sign in Freighter…`);
+			const { hash } = await withdrawShares({
+				source: wallet,
+				bucketId: basket.bucketId,
+				shares,
+			});
+			const usdAmount =
+				shareBalance > 0n && supply
+					? (basket.pnl.currentNavUsd * Number(shares)) / Number(supply)
+					: 0;
+			await recordBasketWithdraw(basket.id, {
+				usdAmount,
+				shares: shares.toString(),
+				txHash: hash,
+				tags: ["withdraw", "freighter"],
+			});
+			setStatusLine(`Withdrawal settled — ${formatBase(shares, 8)} shares burned.`);
+			onDone();
+			void loadChain();
+		} catch (caught) {
+			setStatusLine("");
+			setError(caught instanceof Error ? caught.message : "Withdrawal failed.");
+		} finally {
+			setBusy("");
+		}
+	}
+
+	async function confirmRebalance() {
+		if (busy) return;
+		setBusy("rebalance");
+		setError("");
+		try {
+			setStatusLine("Rebalancing to targets — sign in Freighter…");
+			const { hash, plan: executed } = await rebalanceBucket({
+				source: wallet,
+				bucketId: basket.bucketId,
+			});
+			await recordBasketRebalance(basket.id, {
+				txHash: hash,
+				tags: ["rebalance", "freighter"],
+				meta: {
+					symbols: executed.legs
+						.filter((leg) => leg.action !== "hold")
+						.map((leg) => leg.symbol),
+				},
+			});
+			setStatusLine(
+				executed.needed
+					? `Rebalanced ${executed.legs.filter((l) => l.action !== "hold").length} legs.`
+					: "Already within drift band.",
+			);
+			onDone();
+			void planRebalance(basket.bucketId).then(setPlan).catch(() => {});
+		} catch (caught) {
+			setStatusLine("");
+			setError(caught instanceof Error ? caught.message : "Rebalance failed.");
+		} finally {
+			setBusy("");
+		}
+	}
+
+	const driftingLegs = plan?.legs.filter((leg) => leg.action !== "hold") ?? [];
+
+	return (
+		<div className="basket-actions" aria-label={`Manage ${basket.name}`}>
+			<div className="basket-actions-row">
+				<div className="basket-action-block">
+					<small>
+						Shares owned:{" "}
+						{loading
+							? "…"
+							: shareBalance !== undefined
+								? formatBase(shareBalance, 8)
+								: "unavailable"}
+					</small>
+					{!loading && shareBalance !== undefined && shareBalance > 0n ? (
+						<>
+							<div className="basket-pct-row">
+								{WITHDRAW_PCTS.map((option) => (
+									<button
+										key={option}
+										type="button"
+										className={`button button-outline basket-pct${pct === option ? " is-active" : ""}`}
+										disabled={busy !== ""}
+										onClick={() => setPct(option)}
+									>
+										{option}%
+									</button>
+								))}
+							</div>
+							{Object.keys(preview).length ? (
+								<small className="basket-withdraw-preview">
+									Payout ≈{" "}
+									{Object.entries(preview)
+										.map(([symbol, amount]) => `${amount} ${symbol}`)
+										.join(", ")}
+								</small>
+							) : null}
+							<button
+								type="button"
+								className="button button-outline"
+								disabled={busy !== "" || loading}
+								onClick={() => void confirmWithdraw()}
+							>
+								{busy === "withdraw" ? (
+									<LoaderCircle className="spin" size={16} />
+								) : (
+									<ArrowDownToLine size={16} />
+								)}
+								Withdraw {pct}%
+							</button>
+						</>
+					) : null}
+				</div>
+
+				<div className="basket-action-block">
+					<small>
+						{driftingLegs.length
+							? `${driftingLegs.length} leg(s) outside ${DRIFT_LABEL}: ${driftingLegs
+									.map(
+										(leg) =>
+											`${leg.symbol} ${leg.action} $${Math.abs(leg.driftUsd).toFixed(2)}`,
+									)
+									.join(", ")}`
+							: "All legs within drift band."}
+					</small>
+					<button
+						type="button"
+						className="button button-outline"
+						disabled={busy !== "" || loading}
+						onClick={() => void confirmRebalance()}
+					>
+						{busy === "rebalance" ? (
+							<LoaderCircle className="spin" size={16} />
+						) : (
+							<Scale size={16} />
+						)}
+						Rebalance
+					</button>
+				</div>
+			</div>
+			{statusLine ? <small className="basket-action-status">{statusLine}</small> : null}
+			{error ? (
+				<small className="basket-action-error" role="alert">
+					{error}
+				</small>
+			) : null}
+		</div>
+	);
+}
+
+const DRIFT_LABEL = "±2% target";
+
+function formatBase(value: bigint, decimals: number): string {
+	const fixed = (Number(value) / 10 ** decimals).toFixed(4);
+	return fixed.replace(/\.?0+$/, "");
 }

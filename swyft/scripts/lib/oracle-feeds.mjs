@@ -232,7 +232,8 @@ export async function pushPrices(oracleId, entries) {
 	assembled.sign(kp);
 
 	let sent = await server.sendTransaction(assembled);
-	if (!sent.hash) {
+	const txHash = sent.hash ?? sent.txHash;
+	if (!txHash) {
 		throw new Error(`send rejected: ${JSON.stringify(sent)}`);
 	}
 	const deadline = Date.now() + 60000;
@@ -241,12 +242,12 @@ export async function pushPrices(oracleId, entries) {
 		Date.now() < deadline
 	) {
 		await new Promise((r) => setTimeout(r, 2000));
-		sent = await server.getTransaction(sent.hash);
+		sent = await server.getTransaction(txHash);
 	}
 	if (sent.status !== "SUCCESS") {
 		throw new Error(
-			`tx ${sent.status}: ${JSON.stringify(sent.result_xdr ?? sent.hash)}`,
+			`tx ${sent.status}: ${JSON.stringify(sent.result_xdr ?? txHash)}`,
 		);
 	}
-	return sent.hash;
+	return txHash;
 }
