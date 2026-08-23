@@ -25,6 +25,115 @@ Open http://localhost:5173 — **Docs** in the header (or nav after sign-in) for
 
 Written docs: [`swyft/docs/PRODUCT_GUIDE.md`](swyft/docs/PRODUCT_GUIDE.md) · full deploy notes: [`swyft/README.md`](swyft/README.md).
 
+## Architecture
+
+Vite proxies `/api` → the portfolio API on `:8787` when you run `npm run dev:stack`.
+
+```mermaid
+flowchart TB
+  subgraph Client["swyft UI (Vite :5173)"]
+    Review["MockReview<br/>Invest on Stellar"]
+    Vault["vault.ts<br/>create → approve → deposit"]
+    Freighter["Freighter wallet"]
+    API["portfolio-api.ts"]
+    Activity["ActivityScreen<br/>/activity"]
+  end
+
+  subgraph Chain["Stellar Testnet"]
+    VaultC["bucket-vault contract"]
+  end
+
+  subgraph Server["Portfolio API (:8787)"]
+    Routes["/api/stellar/*"]
+    Service["service.ts"]
+    ActivityMod["activity.ts<br/>appendActivity"]
+  end
+
+  subgraph Store["Persistence"]
+    Baskets["StellarBasket<br/>state + cost basis"]
+    Events["StellarActivity<br/>tagged event log"]
+  end
+
+  Review -->|sign txs| Freighter
+  Freighter --> Vault
+  Vault -->|on-chain| VaultC
+  Vault -->|hashes + shares| Review
+  Review -->|recordStellarBasket| API
+  API -->|POST /baskets| Routes
+  Routes --> Service
+  Service -->|create basket| Baskets
+  Service -->|create + approve + deposit| ActivityMod
+  ActivityMod --> Events
+
+  Activity -->|listWalletActivity| API
+  API -->|GET /wallets/:wallet/activity| Routes
+  Routes --> Service
+  Service -->|list / backfill| Events
+  Service -.->|if empty, synthesize from| Baskets
+  Events -->|tagged feed| Activity
+```
+
+### Two stores
+
+| Store | Collection | Job |
+|---|---|---|
+| **StellarBasket** | portfolio state | “What do I own?” — NAV, shares, allocations, cost basis |
+| **StellarActivity** | tagged event log | “What happened?” — timeline with tags + tx hashes |
+
+Without `MONGODB_URI`, both fall back to in-memory maps (local mock only).
+
+### Invest write path
+
+1. User confirms in **Review** → Freighter signs `create_bucket` → `approve` → `deposit` on the vault.
+2. Client calls `recordStellarBasket(...)` with wallet, bucket id, amounts, and the three tx hashes (`swyft/src/client/stellar/portfolio-api.ts`).
+3. Server creates a **StellarBasket** and appends **three StellarActivity** rows: `create`, `approve`, `deposit` (tags such as `basket`, `initial`, `invest`).
+
+### Later ops (same activity log)
+
+| Action | API | Activity kinds |
+|---|---|---|
+| Extra deposit | `POST /api/stellar/baskets/:id/deposits` | `deposit` |
+| Withdraw | `POST /api/stellar/baskets/:id/withdrawals` | `withdraw` (+ `close` if shares → 0) |
+| Rebalance | `POST /api/stellar/baskets/:id/rebalances` | `rebalance` |
+| Close | `POST /api/stellar/baskets/:id/close` | `close` |
+
+Client helpers: `recordBasketDeposit`, `recordBasketWithdraw`, `recordBasketRebalance`.
+
+### Activity read path
+
+1. **Activity** (`ActivityScreen`) loads `GET /api/stellar/wallets/:wallet/activity`.
+2. Server returns `StellarActivity` sorted newest-first.
+3. If the log is empty but baskets exist, it **backfills** from basket hashes + ledger, then returns that feed.
+4. UI filters by kind (create / deposit / withdraw / rebalance / …) and expands rows for tags + [Stellar.expert](https://stellar.expert/explorer/testnet) links.
+
+### Activity event shape
+
+Each `StellarActivity` document includes:
+
+- `kind`: `create` \| `approve` \| `deposit` \| `withdraw` \| `rebalance` \| `close`
+- `tags`: e.g. `["basket", "deposit", "initial", "invest"]`
+- `ownerWallet`, `basketId`, `bucketId`, `vaultAddress`, `basketName`
+- `usdAmount`, `shares`, `txHash`, `meta` (e.g. allocation symbols), `at`
+
+### Portfolio / activity API surface
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/stellar/baskets` | Record new basket + initial create/approve/deposit activity |
+| `GET` | `/api/stellar/baskets?wallet=` | List baskets |
+| `GET` | `/api/stellar/wallets/:wallet/portfolio` | Active baskets + aggregate PnL |
+| `GET` | `/api/stellar/wallets/:wallet/activity` | Tagged transaction history |
+| `POST` | `/api/stellar/baskets/:id/deposits` | Record deposit + activity |
+| `POST` | `/api/stellar/baskets/:id/withdrawals` | Record withdraw + activity |
+| `POST` | `/api/stellar/baskets/:id/rebalances` | Record rebalance + activity |
+| `POST` | `/api/stellar/baskets/:id/close` | Close basket + activity |
+| `POST` | `/api/stellar/activity` | Append a raw activity event |
+| `POST` | `/api/stellar/faucet` | Testnet DEMOUSD mint |
+| `GET` | `/api/stellar/health` | Health + Mongo flag |
+
+Key server files: `server/src/models.ts`, `server/src/activity.ts`, `server/src/service.ts`, `server/src/routes.ts`.  
+Key client files: `swyft/src/client/stellar/portfolio-api.ts`, `swyft/src/client/components/ActivityScreen.tsx`, `swyft/src/client/mock/MockReview.tsx`.
+
 ## Live testnet deployment
 
 Network: **Stellar Testnet** · [Explorer](https://stellar.expert/explorer/testnet)  
