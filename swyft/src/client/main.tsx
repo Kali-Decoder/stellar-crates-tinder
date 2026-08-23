@@ -1,15 +1,7 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, lazy, Suspense } from "react";
 import { preload } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
-import { PrivyProvider } from "@privy-io/react-auth";
-import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
-import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
-import {
-  createSolanaRpc,
-  createSolanaRpcSubscriptions
-} from "@solana/kit";
-import { defineChain } from "viem";
 import "@fontsource/archivo-black/400.css";
 import "@fontsource/dm-sans/400.css";
 import "@fontsource/dm-sans/500.css";
@@ -18,8 +10,6 @@ import "@fontsource/dm-sans/700.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "@fontsource/instrument-serif/400.css";
 import instrumentSerifRegularUrl from "@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2?url";
-import { App } from "./App";
-import { api, type PublicConfig } from "./api";
 import { isMockUi } from "./mock/enabled";
 import { MockApp } from "./mock/MockApp";
 import { applyStoredTheme } from "./theme";
@@ -28,108 +18,38 @@ import "./styles.css";
 applyStoredTheme();
 
 preload(instrumentSerifRegularUrl, {
-  as: "font",
-  crossOrigin: "anonymous",
-  type: "font/woff2"
+	as: "font",
+	crossOrigin: "anonymous",
+	type: "font/woff2",
 });
 
-const robinhoodChain = defineChain({
-  id: 4663,
-  name: "Robinhood Chain",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://rpc.mainnet.chain.robinhood.com"] }
-  },
-  blockExplorers: {
-    default: {
-      name: "Robinhood Chain Explorer",
-      url: "https://explorer.chain.robinhood.com"
-    }
-  }
-});
-
-function LiveRoot() {
-  const [config, setConfig] = useState<PublicConfig>();
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    api.config()
-      .then(setConfig)
-      .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : "Could not load app configuration")
-      );
-  }, []);
-
-  if (error) {
-    return <main className="fatal-state"><h1>swyft.fun is unavailable</h1><p>{error}</p></main>;
-  }
-  if (!config) {
-    return <main className="loading-state"><span /><h1>Loading swyft.fun</h1></main>;
-  }
-
-  return (
-    <PrivyProvider
-      appId={config.privy.appId}
-      config={{
-        loginMethods: ["email", "wallet"],
-        appearance: {
-          theme: "light",
-          accentColor: "#baff00",
-          walletChainType: "ethereum-and-solana",
-          walletList: [
-            "rainbow",
-            "metamask",
-            "coinbase_wallet",
-            "detected_ethereum_wallets",
-            "phantom",
-            "solflare",
-            "backpack",
-            "jupiter",
-            "detected_solana_wallets",
-            "wallet_connect_qr_solana"
-          ]
-        },
-        externalWallets: {
-          solana: {
-            connectors: toSolanaWalletConnectors({ shouldAutoConnect: false })
-          }
-        },
-        supportedChains: [robinhoodChain],
-        embeddedWallets: {
-          ethereum: { createOnLogin: "all-users" },
-          solana: { createOnLogin: "all-users" }
-        },
-        solana: {
-          rpcs: {
-            "solana:mainnet": {
-              rpc: createSolanaRpc(`${window.location.origin}/api/solana/rpc`),
-              rpcSubscriptions: createSolanaRpcSubscriptions(
-                "wss://api.mainnet-beta.solana.com"
-              ),
-              blockExplorerUrl: "https://explorer.solana.com"
-            }
-          }
-        },
-      }}
-    >
-      <SmartWalletsProvider>
-        <App config={config} />
-      </SmartWalletsProvider>
-    </PrivyProvider>
-  );
-}
+/** Privy / Solana live stack — not loaded on the default Stellar mock path. */
+const LiveRoot = lazy(() =>
+	import("./LiveRoot").then((mod) => ({ default: mod.LiveRoot })),
+);
 
 function Root() {
-  if (isMockUi()) return <MockApp />;
-  return <LiveRoot />;
+	if (isMockUi()) return <MockApp />;
+	return (
+		<Suspense
+			fallback={
+				<main className="loading-state">
+					<span />
+					<h1>Loading swyft.fun</h1>
+				</main>
+			}
+		>
+			<LiveRoot />
+		</Suspense>
+	);
 }
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element is missing");
 
 createRoot(root).render(
-  <StrictMode>
-    <Root />
-    <Analytics />
-  </StrictMode>
+	<StrictMode>
+		<Root />
+		<Analytics />
+	</StrictMode>,
 );

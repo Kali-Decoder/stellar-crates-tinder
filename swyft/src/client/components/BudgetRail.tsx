@@ -4,8 +4,16 @@ import type {
 	ExecutionProviderId,
 } from "../../domain/schemas";
 import { formatTicketSizeUsd } from "../../domain/schemas";
+import { formatUsdPrice } from "../price-format";
 import { AssetMark } from "./AssetMark";
 import { Close } from "./Icons";
+
+function spotPriceUsd(candidate: Candidate): number | undefined {
+	const price = candidate.marketPriceUsd;
+	return typeof price === "number" && Number.isFinite(price) && price > 0
+		? price
+		: undefined;
+}
 
 export function BudgetSummary({
 	selectedCount,
@@ -174,7 +182,9 @@ export function BudgetRail({
 
 					{selected.length ? (
 						<ul className="basket-list">
-							{selected.map((candidate, index) => (
+							{selected.map((candidate, index) => {
+								const spot = spotPriceUsd(candidate);
+								return (
 								<li
 									className="basket-row"
 									key={candidate.assetId}
@@ -187,9 +197,16 @@ export function BudgetRail({
 									/>
 									<div className="basket-main">
 										<div className="basket-row-top">
-											<strong className="basket-symbol">
-												{candidate.symbol}
-											</strong>
+											<span className="basket-symbol-block">
+												<strong className="basket-symbol">
+													{candidate.symbol}
+												</strong>
+												{spot != null ? (
+													<span className="basket-spot">
+														{formatUsdPrice(spot)}
+													</span>
+												) : null}
+											</span>
 											<button
 												type="button"
 												className="basket-remove"
@@ -210,7 +227,8 @@ export function BudgetRail({
 										</div>
 									</div>
 								</li>
-							))}
+								);
+							})}
 						</ul>
 					) : (
 						<div className="basket-empty">

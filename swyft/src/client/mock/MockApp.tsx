@@ -25,7 +25,6 @@ import {
 import { AppShell } from "../components/AppShell";
 import { AssetIconProvider } from "../components/AssetMark";
 import { BudgetRail } from "../components/BudgetRail";
-import { ArrowRight } from "../components/Icons";
 import { Confetti } from "../components/magicui/confetti";
 import { ReceiptScreen } from "../components/ReceiptScreen";
 import { SwipeCard } from "../components/SwipeCard";
@@ -401,7 +400,7 @@ export function MockApp() {
 						<section className="swipe-workspace">
 							<header className="page-heading">
 								<h1>Build your basket</h1>
-								<p>Swipe right to add · left to skip.</p>
+								<p>Drag right to add · left to skip.</p>
 							</header>
 							{error ? (
 								<div className="fatal-state">
@@ -427,18 +426,6 @@ export function MockApp() {
 							) : current ? (
 								<>
 									<div className="card-stage">
-										<button
-											type="button"
-											className="gesture gesture-skip"
-											onClick={() => animateDecision(false)}
-											aria-label="Skip asset"
-											disabled={Boolean(decisionFeedback)}
-										>
-											<span className="gesture-dir" aria-hidden="true">
-												Left
-											</span>
-											<span className="gesture-label">Skip</span>
-										</button>
 										<SwipeCard
 											candidate={current}
 											reason={currentFeedCard?.reason ?? current.reason}
@@ -449,18 +436,32 @@ export function MockApp() {
 											onInfoOpenChange={setAssetInfoOpen}
 											onSwipe={animateDecision}
 										/>
-										<button
-											type="button"
-											className="gesture gesture-add"
-											onClick={() => animateDecision(true)}
-											aria-label={`Add ${ticketSizeUsd} ${stableToken}`}
-											disabled={Boolean(decisionFeedback) || !canAddCurrent}
-										>
-											<span className="gesture-dir" aria-hidden="true">
-												Right
-											</span>
-											<span className="gesture-label">Add</span>
-										</button>
+										<div className="gesture-bar" role="group" aria-label="Swipe actions">
+											<button
+												type="button"
+												className="gesture gesture-skip"
+												onClick={() => animateDecision(false)}
+												aria-label="Skip asset"
+												disabled={Boolean(decisionFeedback)}
+											>
+												<span className="gesture-dir" aria-hidden="true">
+													Left
+												</span>
+												<span className="gesture-label">Skip</span>
+											</button>
+											<button
+												type="button"
+												className="gesture gesture-add"
+												onClick={() => animateDecision(true)}
+												aria-label={`Add ${ticketSizeUsd} ${stableToken}`}
+												disabled={Boolean(decisionFeedback) || !canAddCurrent}
+											>
+												<span className="gesture-dir" aria-hidden="true">
+													Right
+												</span>
+												<span className="gesture-label">Add</span>
+											</button>
+										</div>
 									</div>
 									{currentWarnings.length ? (
 										<aside className="ai-warnings" aria-label="Mock warnings">
@@ -472,34 +473,6 @@ export function MockApp() {
 											</ul>
 										</aside>
 									) : null}
-									<div
-										className={`card-actions${selected.length ? " has-selection" : ""}`}
-									>
-										<button
-											type="button"
-											className="button button-skip"
-											onClick={() => animateDecision(false)}
-											disabled={Boolean(decisionFeedback)}
-										>
-											Skip
-										</button>
-										<button
-											type="button"
-											className="button button-outline"
-											onClick={goReview}
-											disabled={!selected.length}
-										>
-											Review basket ({selected.length}) <ShoppingBasket />
-										</button>
-										<button
-											type="button"
-											className="button button-primary"
-											onClick={() => animateDecision(true)}
-											disabled={Boolean(decisionFeedback) || !canAddCurrent}
-										>
-											Add {ticketSizeUsd} {stableToken}
-										</button>
-									</div>
 								</>
 							) : loadingMore ? (
 								<div className="loading-state loading-more">
@@ -556,54 +529,6 @@ export function MockApp() {
 							onSheetOpenChange={isCompact ? setBasketSheetOpen : undefined}
 							onReview={selected.length ? goReview : undefined}
 						/>
-						<section className="evidence-detail">
-							<div className="feed-method-copy">
-								<h2>How your Swyft feed earns your trust</h2>
-								<p>
-									Built on Stellar. Your rules shape a feed of eligible RWAs and
-									crypto — you approve every basket with your wallet.
-								</p>
-								<ol className="feed-pipeline">
-									<li>
-										<strong>1 · Your rules</strong>
-										<span>Cadence, cap, ticket, risk, and asset mix.</span>
-									</li>
-									<li>
-										<strong>2 · Stellar market data</strong>
-										<span>Reference prices and chart history for the cards.</span>
-									</li>
-									<li>
-										<strong>3 · Ranked feed</strong>
-										<span>Bounded ranking over Stellar-ready candidates.</span>
-									</li>
-									<li>
-										<strong>4 · You approve</strong>
-										<span>Review the basket. Your Stellar wallet signs last.</span>
-									</li>
-								</ol>
-							</div>
-							{feed ? (
-								<details className="feed-proof">
-									<summary>
-										View proof <ArrowRight />
-									</summary>
-									<dl>
-										<div>
-											<dt>Network</dt>
-											<dd>Stellar</dd>
-										</div>
-										<div>
-											<dt>Model</dt>
-											<dd>{feed.proof.model}</dd>
-										</div>
-										<div>
-											<dt>Provider</dt>
-											<dd>Stellar feed</dd>
-										</div>
-									</dl>
-								</details>
-							) : null}
-						</section>
 					</main>
 				)}
 			</AppShell>

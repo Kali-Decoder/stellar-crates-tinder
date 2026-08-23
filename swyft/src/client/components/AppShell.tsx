@@ -1,16 +1,34 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { ConnectedWallet } from "@privy-io/react-auth";
-import type { ConnectedStandardSolanaWallet } from "@privy-io/react-auth/solana";
+import {
+	type ReactNode,
+	lazy,
+	Suspense,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { Wallet } from "lucide-react";
 import { shortStellarAddress } from "../stellar/kit";
 import { ThemeToggle } from "./ThemeToggle";
-import { WalletMenu } from "./WalletMenu";
+
+/** Minimal wallet shape so AppShell stays free of Privy/Solana imports. */
+export type ShellFundingWallet = {
+	address: string;
+};
+
+export type ShellSolanaWallet = {
+	address: string;
+	standardWallet?: { name?: string };
+};
+
+const WalletMenu = lazy(() =>
+	import("./WalletMenu").then((mod) => ({ default: mod.WalletMenu })),
+);
 
 interface Props {
 	active: "week" | "positions" | "receipts" | "account";
 	onNavigate: (target: Props["active"]) => void;
 	wallet?: string;
-	fundingWallet?: ConnectedWallet;
+	fundingWallet?: ShellFundingWallet;
 	topUpRequest?: number;
 	onWallet?: () => void;
 	onDisconnect?: () => void;
@@ -21,11 +39,11 @@ interface Props {
 	mockMode?: boolean;
 	activeChain: "ROBINHOOD" | "SOLANA";
 	onChainChange: (chain: "ROBINHOOD" | "SOLANA") => void;
-	solanaWallets: ConnectedStandardSolanaWallet[];
+	solanaWallets: ShellSolanaWallet[];
 	solanaWalletsReady: boolean;
 	solanaAvailable: boolean;
-	selectedSolanaWallet?: ConnectedStandardSolanaWallet;
-	onSolanaWalletChange: (wallet: ConnectedStandardSolanaWallet) => void;
+	selectedSolanaWallet?: ShellSolanaWallet;
+	onSolanaWalletChange: (wallet: ShellSolanaWallet) => void;
 	children: ReactNode;
 }
 
@@ -71,13 +89,16 @@ export function AppShell({
 		return () => {
 			if (previousChain) root.dataset.chain = previousChain;
 			else delete root.dataset.chain;
-			if (themeColor && previousThemeColor) themeColor.content = previousThemeColor;
+			if (themeColor && previousThemeColor)
+				themeColor.content = previousThemeColor;
 		};
 	}, [activeChain, mockMode]);
 
 	return (
 		<div className="app-shell">
-			<header className={navigationEnabled ? "topbar" : "topbar topbar-onboarding"}>
+			<header
+				className={navigationEnabled ? "topbar" : "topbar topbar-onboarding"}
+			>
 				<button
 					type="button"
 					className="brand"
@@ -115,18 +136,20 @@ export function AppShell({
 									onDisconnect={onDisconnect}
 								/>
 							) : (
-								<WalletMenu
-									wallet={wallet}
-									fundingWallet={fundingWallet}
-									topUpRequest={topUpRequest}
-									activeChain={activeChain}
-									onChainChange={onChainChange}
-									solanaWallets={solanaWallets}
-									solanaWalletsReady={solanaWalletsReady}
-									solanaAvailable={solanaAvailable}
-									selectedSolanaWallet={selectedSolanaWallet}
-									onSolanaWalletChange={onSolanaWalletChange}
-								/>
+								<Suspense fallback={null}>
+									<WalletMenu
+										wallet={wallet}
+										fundingWallet={fundingWallet as never}
+										topUpRequest={topUpRequest}
+										activeChain={activeChain}
+										onChainChange={onChainChange}
+										solanaWallets={solanaWallets as never}
+										solanaWalletsReady={solanaWalletsReady}
+										solanaAvailable={solanaAvailable}
+										selectedSolanaWallet={selectedSolanaWallet as never}
+										onSolanaWalletChange={onSolanaWalletChange as never}
+									/>
+								</Suspense>
 							)}
 						</div>
 					) : (
@@ -138,16 +161,18 @@ export function AppShell({
 							aria-label="Connect Stellar wallet"
 							title="Connect Stellar wallet"
 						>
-						<Wallet size={17} strokeWidth={1.7} />
-						{walletConnecting ? (
-							"Connecting…"
-						) : (
-							<>
-								<span className="wallet-label-full">Connect Stellar wallet</span>
-								<span className="wallet-label-short">Connect</span>
-							</>
-						)}
-					</button>
+							<Wallet size={17} strokeWidth={1.7} />
+							{walletConnecting ? (
+								"Connecting…"
+							) : (
+								<>
+									<span className="wallet-label-full">
+										Connect Stellar wallet
+									</span>
+									<span className="wallet-label-short">Connect</span>
+								</>
+							)}
+						</button>
 					)}
 				</div>
 			</header>
@@ -190,7 +215,7 @@ function StellarConnectedPill({
 			{open ? (
 				<div className="wallet-menu-content" role="menu">
 					<div className="wallet-menu-heading">
-		<span>Stellar wallet</span>
+						<span>Stellar wallet</span>
 						<strong>{shortStellarAddress(address)}</strong>
 					</div>
 					{onDisconnect ? (
