@@ -1,3 +1,5 @@
+import { STELLAR_SUPPORTED_ASSET_COUNT } from "./stellar/config";
+
 export type DocsSection = {
 	id: string;
 	title: string;
@@ -18,6 +20,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 		],
 		bullets: [
 			"Stellar testnet today (Freighter / Stellar Wallets Kit)",
+			`${STELLAR_SUPPORTED_ASSET_COUNT} tokenized assets deployed on Stellar (plus USDC settlement)`,
 			"Soroban vault buckets with equal-weight allocations",
 			"Live spots from DIA’s RWA oracle APIs",
 			"Portfolio tracking via the Mongo-backed stellar API",
@@ -72,7 +75,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 		summary: "Swipe cards into a budget-aware selection.",
 		body: [
 			"Each card shows an asset mark, live DIA-anchored price chart, and ticket stamp. The budget rail tracks remaining limit and selected names.",
-			"Assets without a deployed vault token can still appear in the feed; Review skips them on-chain and redistributes weight across deployable symbols.",
+			`Swyft currently supports ${STELLAR_SUPPORTED_ASSET_COUNT} deployable vault tokens on Stellar. Assets without a deployed vault token can still appear in the feed; Review skips them on-chain and redistributes weight across deployable symbols.`,
 		],
 		bullets: [
 			"Add — includes the asset if another ticket fits",

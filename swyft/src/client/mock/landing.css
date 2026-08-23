@@ -809,6 +809,15 @@
 .landing-assets-head > div {
   max-width: 640px;
 }
+.landing-assets-head .landing-assets-count {
+  margin: 0 0 8px;
+  color: var(--landing-mint);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
 .landing-explore {
   display: inline-flex;
   align-items: center;

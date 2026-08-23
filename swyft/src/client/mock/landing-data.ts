@@ -120,8 +120,9 @@ export const LANDING_ASSET_CLASSES: LandingAssetClass[] = [
 		id: "stocks",
 		tag: "Public markets",
 		title: "Stocks",
-		description: "Access 600+ companies from the U.S. and global markets.",
-		summary: "600+ stocks",
+		description:
+			"Tokenized equities from blue chips to growth names, priced by DIA and settled on Stellar.",
+		summary: "Equities on-chain",
 		symbols: ["NVDA", "TSLA", "AAPL"],
 	},
 	{
@@ -129,16 +130,17 @@ export const LANDING_ASSET_CLASSES: LandingAssetClass[] = [
 		tag: "Digital assets",
 		title: "Crypto",
 		description:
-			"Discover established assets and emerging tokens settling on Stellar.",
-		summary: "Majors + XLM",
-		symbols: ["BTC", "ETH", "XLM"],
+			"Bitcoin and ether exposure via listed ETF wrappers, plus majors settling beside USDC.",
+		summary: "BTC & ETH wrappers",
+		symbols: ["IBIT", "ETHA", "BITO"],
 	},
 	{
 		id: "pre-ipo",
-		tag: "Private-market themes",
-		title: "Pre-IPO",
-		description: "Gain exposure to private companies before they go public.",
-		summary: "Theme baskets",
+		tag: "Tech & consumer",
+		title: "Mega-caps",
+		description:
+			"Swipe into household names already live as vault-ready Stellar tokens.",
+		summary: "Mega-cap stocks",
 		symbols: ["MSFT", "GOOGL", "AMZN"],
 	},
 	{
@@ -146,9 +148,9 @@ export const LANDING_ASSET_CLASSES: LandingAssetClass[] = [
 		tag: "Real assets",
 		title: "Commodities",
 		description:
-			"Invest in gold, silver, platinum, and palladium through commodity trusts.",
-		summary: "Metals & trusts",
-		symbols: ["GLD", "SLV", "IAU"],
+			"Gold, silver, oil, gas, and metals feeds routed through DIA commodity markets.",
+		summary: "Metals & energy",
+		symbols: ["XAU", "XAGG", "WTI"],
 		wide: true,
 	},
 	{
@@ -156,9 +158,9 @@ export const LANDING_ASSET_CLASSES: LandingAssetClass[] = [
 		tag: "Funds & strategies",
 		title: "ETFs",
 		description:
-			"Explore broad markets, sectors, bonds, treasuries, and select strategies.",
-		summary: "Funds & sectors",
-		symbols: ["SPY", "QQQ", "IWM"],
+			"Broad indexes, bonds, and sector funds you can basket with the same swipe ritual.",
+		summary: "Indexes & funds",
+		symbols: ["SPY", "QQQ", "VOO"],
 		wide: true,
 	},
 ];

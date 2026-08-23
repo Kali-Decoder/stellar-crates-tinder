@@ -25,6 +25,7 @@ import {
 } from "./landing-data";
 import { LandingBasketCard, LandingBasketDeck, TickerLogo } from "./LandingBasketDeck";
 import { StableTokenLabel } from "../components/StableTokenLabel";
+import { STELLAR_SUPPORTED_ASSET_COUNT } from "../stellar/config";
 import "./landing.css";
 
 export function MockLanding({
@@ -417,10 +418,14 @@ function AssetsSection({ onExplore }: { onExplore: () => void }) {
 		>
 			<header className="landing-assets-head">
 				<div>
+					<p className="landing-assets-count">
+						{STELLAR_SUPPORTED_ASSET_COUNT} assets on Stellar
+					</p>
 					<h2>Assets for every strategy.</h2>
 					<p>
-						Choose curated baskets or individual RWAs — then swipe them into a
-						Stellar vault in one ritual.
+						{STELLAR_SUPPORTED_ASSET_COUNT} tokenized RWAs are live on Stellar
+						today — stocks, ETFs, commodities, and FX — ready to swipe into a
+						vault with USDC.
 					</p>
 				</div>
 				<button type="button" className="landing-explore" onClick={onExplore}>

@@ -33,6 +33,11 @@ export function hasStellarToken(symbol: string): boolean {
 	return Boolean(stellarTokenAddress(symbol));
 }
 
+/** Deployed RWA / crypto token contracts on Stellar (excludes USDC settlement). */
+export const STELLAR_SUPPORTED_ASSET_COUNT = Object.keys(
+	stellarConfig.tokens,
+).length;
+
 export function explorerTxUrl(hash: string): string {
 	return `https://stellar.expert/explorer/testnet/tx/${hash}`;
 }
