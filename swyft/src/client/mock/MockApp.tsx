@@ -32,7 +32,7 @@ import { AssetIconProvider } from "../components/AssetMark";
 import { BudgetRail } from "../components/BudgetRail";
 import { Confetti } from "../components/magicui/confetti";
 import { LicenseGate } from "../components/LicenseModal";
-import { ReceiptScreen } from "../components/ReceiptScreen";
+import { ActivityScreen } from "../components/ActivityScreen";
 import { DocsScreen } from "../components/DocsScreen";
 import { SwipeCard } from "../components/SwipeCard";
 import {
@@ -106,9 +106,6 @@ function MockAppRoutes() {
 	const [assetInfoOpen, setAssetInfoOpen] = useState(false);
 	const [settlement, setSettlement] = useState<ExecutionRecord>(
 		() => DEMO_ACTIVITY.record,
-	);
-	const [receiptCandidates, setReceiptCandidates] = useState<Candidate[]>(
-		() => DEMO_ACTIVITY.candidates,
 	);
 	const [error, setError] = useState("");
 	const [decisionFeedback, setDecisionFeedback] = useState<DecisionFeedback>();
@@ -466,19 +463,9 @@ function MockAppRoutes() {
 						onConnectWallet={() => void handleConnectWallet()}
 					/>
 				) : page === "activity" ? (
-					<ReceiptScreen
-						record={settlement}
-						selected={receiptCandidates.length ? receiptCandidates : selected}
-						feed={feed}
-						demoMode={false}
-						onResume={async () => {
-							if (!settlement) return;
-							try {
-								setSettlement(await api.reconcile(settlement.plan.executionId));
-							} catch {
-								setSettlement(DEMO_ACTIVITY.record);
-							}
-						}}
+					<ActivityScreen
+						wallet={wallet ?? ""}
+						latestSettlement={settlement}
 						onViewPortfolio={() => goTo("portfolio")}
 						onStartNextBasket={() => {
 							if (preferences) {
@@ -527,7 +514,6 @@ function MockAppRoutes() {
 						onBack={() => goTo("basket")}
 						onSettled={(record) => {
 							setSettlement(record);
-							setReceiptCandidates(selected);
 							goTo("activity");
 						}}
 						onExecutionChange={setSettlement}

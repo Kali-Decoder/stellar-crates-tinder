@@ -5,7 +5,7 @@ import {
 	FileText,
 	LoaderCircle,
 	RotateCcw,
-	SlidersHorizontal,
+	ShieldCheck,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
@@ -13,13 +13,15 @@ import type { Candidate } from "../../domain/schemas";
 import type { ExecutionRecord, FeedResponse } from "../api";
 import { AssetMark } from "./AssetMark";
 import { Confetti } from "./magicui/confetti";
-import { Check, Shield } from "./Icons";
+import { Check } from "./Icons";
 import { StableTokenLabel } from "./StableTokenLabel";
+
+const STELLAR_HASH = /^[a-fA-F0-9]{64}$/;
 
 export function ReceiptScreen({
 	record,
 	selected,
-	feed,
+	feed: _feed,
 	demoMode,
 	onResume,
 	onViewPortfolio,
@@ -44,18 +46,19 @@ export function ReceiptScreen({
 	if (!record) {
 		return (
 			<main className="receipt-page activity-page">
-				<header className="receipt-heading activity-heading">
-					<div>
-						<span className="eyebrow">Activity</span>
-						<h1>No settlements yet</h1>
-						<p>
-							Terminal receipts appear here after you invest in a basket.
-							Quotes alone never count as settled.
-						</p>
-					</div>
+				<header className="activity-hero">
+					<span className="eyebrow">Activity</span>
+					<h1>No settlements yet</h1>
+					<p>
+						Invest from Review to mint vault shares. Receipts and Stellar
+						transaction links show up here.
+					</p>
 				</header>
 				<section className="activity-empty-card">
-					<p>Build a basket, then settle from Review to see activity here.</p>
+					<p>
+						Swipe a basket, confirm on Freighter, then return here for the
+						settlement receipt.
+					</p>
 					<button
 						type="button"
 						className="button button-primary"
@@ -68,20 +71,23 @@ export function ReceiptScreen({
 		);
 	}
 
+	const isStellarTx = record.transactionHashes.some((hash) =>
+		STELLAR_HASH.test(hash),
+	);
+	const isStellar = demoMode || isStellarTx;
+	const inputDecimals = isStellar ? 6 : 6;
 	const isTerminal = ["SETTLED", "PARTIAL", "FAILED"].includes(record.status);
 	const successfulLegs = record.settledOutputs.filter(
 		(output) => output.status === "success",
 	).length;
-	const isStellarTx = record.transactionHashes.some((hash) =>
-		/^[a-fA-F0-9]{64}$/.test(hash),
-	);
-	const chainLabel =
-		demoMode || isStellarTx
-			? "Stellar"
-			: record.plan.chain === "SOLANA"
-				? "Solana"
-				: "Robinhood Chain";
-	const providerLabel = executionProviderLabel(record.plan.provider);
+	const chainLabel = isStellar
+		? "Stellar"
+		: record.plan.chain === "SOLANA"
+			? "Solana"
+			: "Robinhood Chain";
+	const providerLabel = isStellar
+		? "bucket-vault"
+		: executionProviderLabel(record.plan.provider);
 	const receiptStatus = receiptCopy(
 		record.status,
 		selected.length,
@@ -89,26 +95,35 @@ export function ReceiptScreen({
 		chainLabel,
 		providerLabel,
 		record.submissionMode,
+		isStellar,
 	);
 	const outputsByAssetId = new Map(
 		record.settledOutputs.map((output) => [output.assetId, output]),
 	);
-	const transactionHash = record.transactionHashes.at(-1);
 	const isPending = record.status === "SUBMITTED";
 	const isSettled = record.status === "SETTLED";
+	const isFailed = record.status === "FAILED";
 	const stableToken =
-		demoMode || isStellarTx || record.plan.chain === "SOLANA" ? "USDC" : "USDG";
+		isStellar || record.plan.chain === "SOLANA" ? "USDC" : "USDG";
 	const totalInput = formatUsd(
-		formatUnits(BigInt(record.plan.totalInputBaseUnits), 6),
+		formatUnits(BigInt(record.plan.totalInputBaseUnits), inputDecimals),
 	);
-	const settledDescription = `${totalInput} was split across ${successfulLegs} ${successfulLegs === 1 ? "asset" : "assets"} and added to your portfolio.`;
-	const receiptTitle = isSettled ? "Basket settled" : receiptStatus.title;
+	const settledDescription = isStellar
+		? `${totalInput} USDC deposited into your personal vault bucket across ${successfulLegs} ${successfulLegs === 1 ? "asset" : "assets"}.`
+		: `${totalInput} was split across ${successfulLegs} ${successfulLegs === 1 ? "asset" : "assets"} and added to your portfolio.`;
+	const receiptTitle = isSettled
+		? isStellar
+			? "Basket on Stellar"
+			: "Basket settled"
+		: receiptStatus.title;
 	const receiptDescription = isSettled
 		? settledDescription
 		: receiptStatus.description;
-	const transactionUrl = transactionHash
-		? explorerUrl(transactionHash, record.plan.chain)
-		: undefined;
+
+	const stellarSteps = isStellar
+		? labelStellarHashes(record.transactionHashes)
+		: [];
+	const fallbackHash = record.transactionHashes.at(-1);
 
 	return (
 		<main className="receipt-page activity-page">
@@ -116,37 +131,49 @@ export function ReceiptScreen({
 				<Confetti
 					className="receipt-confetti"
 					options={{
-						colors: ["#baff00", "#111111", "#ffffff"],
+						colors: ["#2fd4a8", "#071018", "#ffffff"],
 						gravity: 0.9,
-						particleCount: 120,
-						spread: 92,
-						startVelocity: 38,
+						particleCount: 100,
+						spread: 88,
+						startVelocity: 34,
 					}}
 				/>
 			) : null}
 
-			<header className="receipt-heading activity-heading" aria-live="polite">
-				<span
-					className={`receipt-check ${isPending ? "pending" : record.status === "FAILED" ? "failed" : ""}`}
-				>
-					{isPending ? (
-						<LoaderCircle />
-					) : record.status === "FAILED" ? (
-						<span aria-hidden="true">!</span>
-					) : (
-						<Check />
-					)}
-				</span>
-				<div>
-					<span className="eyebrow">Activity</span>
-					<h1>{receiptTitle}</h1>
-					<p>{receiptDescription}</p>
+			<header className="activity-hero" aria-live="polite">
+				<div className="activity-hero-top">
+					<span
+						className={`activity-status-orb${isPending ? " is-pending" : ""}${isFailed ? " is-failed" : ""}${isSettled ? " is-ok" : ""}`}
+						aria-hidden="true"
+					>
+						{isPending ? (
+							<LoaderCircle />
+						) : isFailed ? (
+							"!"
+						) : (
+							<Check />
+						)}
+					</span>
+					<div>
+						<span className="eyebrow">Activity</span>
+						<h1>{receiptTitle}</h1>
+						<p>{receiptDescription}</p>
+					</div>
+				</div>
+				<div className="activity-hero-tags">
+					<span className="activity-tag">{chainLabel}</span>
+					<span className="activity-tag">{providerLabel}</span>
+					<span
+						className={`activity-tag activity-status-chip status-${record.status.toLowerCase()}`}
+					>
+						{record.status}
+					</span>
 				</div>
 			</header>
 
 			<section className="activity-summary" aria-label="Settlement summary">
 				<div className="activity-stat">
-					<small>Spent</small>
+					<small>Deposited</small>
 					<strong>
 						{totalInput} <StableTokenLabel token={stableToken} />
 					</strong>
@@ -156,37 +183,33 @@ export function ReceiptScreen({
 					<strong>{selected.length || record.plan.quotes.length}</strong>
 				</div>
 				<div className="activity-stat">
-					<small>Status</small>
-					<strong
-						className={
-							isSettled ? "pnl-up" : record.status === "FAILED" ? "pnl-down" : ""
-						}
-					>
-						{record.status}
-					</strong>
-				</div>
-				<div className="activity-stat">
 					<small>Network</small>
 					<strong>{chainLabel}</strong>
+				</div>
+				<div className="activity-stat">
+					<small>{isStellar ? "Vault" : "Provider"}</small>
+					<strong>{providerLabel}</strong>
 				</div>
 			</section>
 
 			<section className="activity-ledger">
 				<div className="activity-ledger-head">
-					<h2>What you bought</h2>
-					<span className="activity-tag">{providerLabel}</span>
-					<span className="activity-tag">{chainLabel}</span>
+					<h2>{isStellar ? "Basket allocations" : "What you bought"}</h2>
+					{isStellar ? (
+						<span className="activity-tag">Equal weight</span>
+					) : (
+						<span className="activity-tag">{providerLabel}</span>
+					)}
 				</div>
 
 				{!selected.length ? (
 					<p className="receipt-missing-snapshot">
-						The operation is preserved, but its local card snapshot is
-						unavailable. Open the transaction receipt for the canonical onchain
-						details.
+						Local asset cards are unavailable. Open the transaction receipt for
+						on-chain details.
 					</p>
 				) : null}
 
-				<div className="activity-asset-list" role="list">
+				<ul className="activity-asset-list">
 					{selected.map((candidate) => {
 						const output = outputsByAssetId.get(candidate.assetId);
 						const isSuccess = output?.status === "success";
@@ -205,7 +228,9 @@ export function ReceiptScreen({
 								: undefined;
 						const open = expandedId === candidate.assetId;
 						const statusLabel = isSuccess
-							? "Received"
+							? isStellar
+								? "Allocated"
+								: "Received"
 							: output?.status === "failed"
 								? "Failed"
 								: isTerminal
@@ -213,10 +238,9 @@ export function ReceiptScreen({
 									: "Pending";
 
 						return (
-							<article
+							<li
 								key={candidate.assetId}
 								className={`activity-asset-card${open ? " is-open" : ""}`}
-								role="listitem"
 							>
 								<button
 									type="button"
@@ -248,7 +272,10 @@ export function ReceiptScreen({
 										{quote ? (
 											<span className="activity-amount-tag">
 												{formatUsd(
-													formatUnits(BigInt(quote.amountInBaseUnits), 6),
+													formatUnits(
+														BigInt(quote.amountInBaseUnits),
+														inputDecimals,
+													),
 												)}
 											</span>
 										) : null}
@@ -264,22 +291,27 @@ export function ReceiptScreen({
 								{open ? (
 									<div className="activity-asset-detail">
 										<div className="activity-detail-row">
-											<span>Allocation</span>
+											<span>Ticket</span>
 											<strong>
 												{quote
 													? formatUsd(
-															formatUnits(BigInt(quote.amountInBaseUnits), 6),
+															formatUnits(
+																BigInt(quote.amountInBaseUnits),
+																inputDecimals,
+															),
 														)
 													: "—"}{" "}
 												<StableTokenLabel token={stableToken} />
 											</strong>
 										</div>
 										<div className="activity-detail-row">
-											<span>Received</span>
+											<span>{isStellar ? "Target" : "Received"}</span>
 											<strong>
 												{fullOutput
 													? `${formatTokenAmount(fullOutput)} ${candidate.symbol}`
-													: "—"}
+													: isStellar
+														? "Vault shares (basket)"
+														: "—"}
 											</strong>
 										</div>
 										{quote?.unitPriceUsd ? (
@@ -293,31 +325,46 @@ export function ReceiptScreen({
 										{output?.transactionHash ? (
 											<div className="activity-detail-row">
 												<span>Tx</span>
-												<code>{shortHash(output.transactionHash)}</code>
+												{STELLAR_HASH.test(output.transactionHash) ? (
+													<a
+														href={explorerUrl(
+															output.transactionHash,
+															record.plan.chain,
+														)}
+														target="_blank"
+														rel="noreferrer"
+													>
+														{shortHash(output.transactionHash)}
+													</a>
+												) : (
+													<code>{shortHash(output.transactionHash)}</code>
+												)}
 											</div>
 										) : null}
 									</div>
 								) : null}
-							</article>
+							</li>
 						);
 					})}
-				</div>
+				</ul>
 
 				<div
-					className={`receipt-verification ${isPending ? "pending" : record.status === "FAILED" ? "failed" : ""}`}
+					className={`activity-verify-banner${isPending ? " is-pending" : ""}${isFailed ? " is-failed" : ""}`}
 				>
-					{isPending ? <LoaderCircle /> : <Check />}
-					<b>
-						{isSettled
-							? `Verified on ${chainLabel}`
-							: `${record.status.toLowerCase()} on ${chainLabel}`}
-					</b>
+					{isPending ? <LoaderCircle size={18} /> : <ShieldCheck size={18} />}
+					<div>
+						<strong>
+							{isSettled
+								? isStellar
+									? "Verified on Stellar testnet"
+									: `Verified on ${chainLabel}`
+								: `${record.status.toLowerCase()} on ${chainLabel}`}
+						</strong>
+						{record.settledAt ? (
+							<small>Settled {formatSettledAt(record.settledAt)}</small>
+						) : null}
+					</div>
 				</div>
-				{record.settledAt ? (
-					<p className="receipt-captured-at">
-						Settled {formatSettledAt(record.settledAt)}
-					</p>
-				) : null}
 			</section>
 
 			<section className="activity-technical">
@@ -328,101 +375,103 @@ export function ReceiptScreen({
 					onClick={() => setDetailsOpen((value) => !value)}
 				>
 					<span className="receipt-detail-icon">
-						<SlidersHorizontal aria-hidden="true" />
+						<FileText aria-hidden="true" />
 					</span>
 					<span>
-						<b>How this was executed</b>
+						<b>{isStellar ? "On-chain steps" : "How this was executed"}</b>
 						<small>
-							One {providerLabel} transaction · {record.plan.quotes.length}{" "}
-							swaps
+							{isStellar
+								? `${Math.max(stellarSteps.length, 1)} Freighter transaction${stellarSteps.length === 1 ? "" : "s"}`
+								: `One ${providerLabel} transaction · ${record.plan.quotes.length} swaps`}
 						</small>
 					</span>
 					<ChevronDown aria-hidden="true" />
 				</button>
 
 				{detailsOpen ? (
-					<div className="receipt-proof activity-proof">
-						<p>
-							<Shield />
-							<span>
-								Execution provider<b>{providerLabel}</b>
-							</span>
+					<div className="activity-proof">
+						{isStellar ? (
+							<ul className="activity-step-list">
+								{(stellarSteps.length
+									? stellarSteps
+									: [
+											{
+												label: "Settlement",
+												hash: fallbackHash,
+											},
+										]
+								).map((step) => (
+									<li key={`${step.label}-${step.hash ?? "pending"}`}>
+										<div>
+											<strong>{step.label}</strong>
+											<small>
+												{step.hash ? shortHash(step.hash) : "Pending"}
+											</small>
+										</div>
+										{step.hash && STELLAR_HASH.test(step.hash) ? (
+											<a
+												href={explorerUrl(step.hash, record.plan.chain)}
+												target="_blank"
+												rel="noreferrer"
+												aria-label={`View ${step.label} on Stellar Expert`}
+											>
+												<ExternalLink size={18} aria-hidden="true" />
+											</a>
+										) : null}
+									</li>
+								))}
+							</ul>
+						) : (
+							<>
+								<p>
+									<span>
+										Execution provider
+										<b>{providerLabel}</b>
+									</span>
+								</p>
+								<p>
+									<span>
+										Authorized plan
+										<b>{shortHash(record.plan.authorizedPlanHash)}</b>
+									</span>
+								</p>
+								{fallbackHash ? (
+									<p>
+										<span>
+											Transaction
+											<b>{shortHash(fallbackHash)}</b>
+										</span>
+									</p>
+								) : null}
+							</>
+						)}
+						<p className="activity-proof-note">
+							{isStellar
+								? "You signed create_bucket → approve USDC → deposit. Shares stay in your Freighter wallet."
+								: `Settlement is verified from the ${chainLabel} operation and transfers to your wallet.`}
 						</p>
-						<p>
-							<Shield />
-							<span>
-								Authorized plan
-								<b>{shortHash(record.plan.authorizedPlanHash)}</b>
-							</span>
-						</p>
-						<p>
-							<Shield />
-							<span>
-								Policy hash<b>{shortHash(record.plan.policyHash)}</b>
-							</span>
-						</p>
-						<p>
-							<Shield />
-							<span>
-								Ranking output
-								<b>
-									{feed
-										? shortHash(feed.proof.outputCommitment)
-										: "Feed snapshot unavailable"}
-								</b>
-							</span>
-						</p>
-						{feed?.proof.teeVerified ? (
-							<div className="receipt-proof-links">
-								<a
-									href={zeroGProviderUrl(feed.proof.provider)}
-									target="_blank"
-									rel="noreferrer"
-								>
-									View TEE provider on 0G Explorer ↗
-								</a>
-								<a
-									href="https://0g.ai/product"
-									target="_blank"
-									rel="noreferrer"
-								>
-									About 0G private inference ↗
-								</a>
-							</div>
-						) : null}
-						<div className="live-disclosure">
-							{record.submissionMode === "BATCH"
-								? `Settlement is verified from the atomic ${chainLabel} operation and output-token transfers to your Swyft Wallet.`
-								: `Settlement is verified per ${chainLabel} transaction and output-token transfer to your Swyft Wallet.`}
-						</div>
 					</div>
 				) : null}
 
-				<div className="receipt-transaction-row activity-tx-row">
-					<span className="receipt-detail-icon">
-						<FileText aria-hidden="true" />
-					</span>
-					<span>
-						<b>Transaction receipt</b>
-						<small>
-							{transactionHash
-								? shortHash(transactionHash)
-								: "Awaiting operation hash"}
-						</small>
-					</span>
-					{transactionUrl ? (
+				{!isStellar && fallbackHash ? (
+					<div className="receipt-transaction-row activity-tx-row">
+						<span className="receipt-detail-icon">
+							<FileText aria-hidden="true" />
+						</span>
+						<span>
+							<b>Transaction receipt</b>
+							<small>{shortHash(fallbackHash)}</small>
+						</span>
 						<a
-							href={transactionUrl}
+							href={explorerUrl(fallbackHash, record.plan.chain)}
 							target="_blank"
 							rel="noreferrer"
 							aria-label={`View transaction on ${chainLabel}`}
 						>
 							<ExternalLink aria-hidden="true" />
 						</a>
-					) : (
-						<span className="activity-tag">{chainLabel}</span>
-					)}
-				</div>
+					</div>
+				) : null}
 			</section>
 
 			<div className="receipt-actions">
@@ -445,7 +494,7 @@ export function ReceiptScreen({
 				) : null}
 				<button
 					type="button"
-					className="button button-quiet"
+					className="button button-outline"
 					onClick={onStartNextBasket}
 				>
 					Build another basket
@@ -453,6 +502,19 @@ export function ReceiptScreen({
 			</div>
 		</main>
 	);
+}
+
+function labelStellarHashes(hashes: string[]) {
+	const labels =
+		hashes.length >= 3
+			? ["Create bucket", "Approve USDC", "Deposit"]
+			: hashes.length === 2
+				? ["Approve USDC", "Deposit"]
+				: ["Deposit"];
+	return hashes.map((hash, index) => ({
+		label: labels[index] ?? `Transaction ${index + 1}`,
+		hash,
+	}));
 }
 
 function useSettlementConfetti(record?: ExecutionRecord) {
@@ -464,12 +526,12 @@ function useSettlementConfetti(record?: ExecutionRecord) {
 		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 		const executionId = record.plan.executionId;
 		if (shownExecution.current !== executionId) {
-			const storageKey = `investmade:settlement-confetti:${executionId}`;
+			const storageKey = `swyft:settlement-confetti:${executionId}`;
 			try {
 				if (sessionStorage.getItem(storageKey)) return;
 				sessionStorage.setItem(storageKey, "shown");
 			} catch {
-				// A blocked session store should not prevent the celebration.
+				// ignore
 			}
 			shownExecution.current = executionId;
 		}
@@ -523,17 +585,13 @@ function formatSettledAt(iso: string) {
 }
 
 function explorerUrl(hash: string, chain: ExecutionRecord["plan"]["chain"]) {
-	if (/^[a-fA-F0-9]{64}$/.test(hash)) {
+	if (STELLAR_HASH.test(hash)) {
 		return `https://stellar.expert/explorer/testnet/tx/${hash}`;
 	}
 	if (chain === "SOLANA") {
 		return `https://solscan.io/tx/${hash}`;
 	}
 	return `https://explorer.robinhood.com/tx/${hash}`;
-}
-
-function zeroGProviderUrl(provider: string) {
-	return `https://explorer.0g.ai/address/${provider}`;
 }
 
 function receiptCopy(
@@ -543,11 +601,14 @@ function receiptCopy(
 	chainLabel: string,
 	providerLabel: string,
 	submissionMode: ExecutionRecord["submissionMode"],
+	isStellar: boolean,
 ) {
 	if (status === "SETTLED") {
 		return {
-			title: "Basket settled",
-			description: `Settled on ${chainLabel} via ${providerLabel}.`,
+			title: isStellar ? "Basket on Stellar" : "Basket settled",
+			description: isStellar
+				? "Vault shares minted after Freighter approvals."
+				: `Settled on ${chainLabel} via ${providerLabel}.`,
 		};
 	}
 	if (status === "PARTIAL") {

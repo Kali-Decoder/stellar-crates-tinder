@@ -61,3 +61,47 @@ export type BasketDoc = InferSchemaType<typeof basketSchema> & {
 export const BasketModel: Model<BasketDoc> =
 	(mongoose.models.StellarBasket as Model<BasketDoc> | undefined) ??
 	model<BasketDoc>("StellarBasket", basketSchema);
+
+const ACTIVITY_KINDS = [
+	"create",
+	"approve",
+	"deposit",
+	"withdraw",
+	"rebalance",
+	"close",
+] as const;
+
+const activitySchema = new Schema(
+	{
+		ownerWallet: { type: String, required: true, index: true },
+		basketId: { type: String, default: "", index: true },
+		bucketId: { type: Number, required: true, index: true },
+		vaultAddress: { type: String, required: true },
+		basketName: { type: String, default: "" },
+		kind: { type: String, enum: ACTIVITY_KINDS, required: true, index: true },
+		tags: { type: [String], default: [] },
+		usdAmount: { type: Number, default: 0 },
+		shares: { type: String, default: "" },
+		txHash: { type: String, default: "" },
+		meta: { type: Schema.Types.Mixed, default: {} },
+		at: { type: Date, default: Date.now, index: true },
+	},
+	{ timestamps: false },
+);
+
+activitySchema.index({ ownerWallet: 1, at: -1 });
+activitySchema.index({ ownerWallet: 1, kind: 1, at: -1 });
+activitySchema.index(
+	{ txHash: 1 },
+	{ unique: true, partialFilterExpression: { txHash: { $type: "string", $gt: "" } } },
+);
+
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+export type ActivityDoc = InferSchemaType<typeof activitySchema> & {
+	_id: { toString(): string };
+};
+
+export const ActivityModel: Model<ActivityDoc> =
+	(mongoose.models.StellarActivity as Model<ActivityDoc> | undefined) ??
+	model<ActivityDoc>("StellarActivity", activitySchema);

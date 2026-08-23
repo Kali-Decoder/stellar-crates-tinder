@@ -32,6 +32,36 @@ export type StellarBasketRecord = {
 	updatedAt: string;
 };
 
+export type BasketActivityKind =
+	| "create"
+	| "approve"
+	| "deposit"
+	| "withdraw"
+	| "rebalance"
+	| "close";
+
+export type BasketActivityEvent = {
+	id: string;
+	ownerWallet: string;
+	basketId: string;
+	bucketId: number;
+	vaultAddress: string;
+	basketName: string;
+	kind: BasketActivityKind;
+	tags: string[];
+	usdAmount: number;
+	shares: string;
+	txHash: string;
+	meta: Record<string, unknown>;
+	at: string;
+};
+
+export type WalletActivityPayload = {
+	wallet: string;
+	count: number;
+	events: BasketActivityEvent[];
+};
+
 export type BasketPnlPayload = {
 	costBasisUsd: number;
 	currentNavUsd: number;
@@ -95,6 +125,7 @@ export async function recordStellarBasket(input: {
 	createTxHash: string;
 	approveTxHash: string;
 	depositTxHash: string;
+	tags?: string[];
 }): Promise<StellarBasketRecord> {
 	const allocations = await Promise.all(
 		input.allocations.map(async (leg) => {
@@ -128,6 +159,7 @@ export async function recordStellarBasket(input: {
 			createTxHash: input.createTxHash,
 			approveTxHash: input.approveTxHash,
 			depositTxHash: input.depositTxHash,
+			tags: input.tags,
 		}),
 	});
 }
@@ -153,6 +185,54 @@ export function getStellarBasketPnl(id: string) {
 export function getWalletPortfolio(wallet: string) {
 	return jsonFetch<WalletPortfolioPayload>(
 		`/api/stellar/wallets/${encodeURIComponent(wallet)}/portfolio`,
+	);
+}
+
+/** Full tagged history: create, approve, deposit, withdraw, rebalance, close. */
+export function listWalletActivity(
+	wallet: string,
+	opts?: { kind?: BasketActivityKind; limit?: number },
+) {
+	const query = new URLSearchParams();
+	if (opts?.kind) query.set("kind", opts.kind);
+	if (opts?.limit) query.set("limit", String(opts.limit));
+	const suffix = query.toString() ? `?${query}` : "";
+	return jsonFetch<WalletActivityPayload>(
+		`/api/stellar/wallets/${encodeURIComponent(wallet)}/activity${suffix}`,
+	);
+}
+
+export function recordBasketDeposit(
+	basketId: string,
+	input: { usdAmount: number; shares: string; txHash?: string; tags?: string[] },
+) {
+	return jsonFetch<StellarBasketRecord>(
+		`/api/stellar/baskets/${encodeURIComponent(basketId)}/deposits`,
+		{ method: "POST", body: JSON.stringify(input) },
+	);
+}
+
+export function recordBasketWithdraw(
+	basketId: string,
+	input: { usdAmount: number; shares: string; txHash?: string; tags?: string[] },
+) {
+	return jsonFetch<StellarBasketRecord>(
+		`/api/stellar/baskets/${encodeURIComponent(basketId)}/withdrawals`,
+		{ method: "POST", body: JSON.stringify(input) },
+	);
+}
+
+export function recordBasketRebalance(
+	basketId: string,
+	input: {
+		txHash: string;
+		tags?: string[];
+		meta?: Record<string, unknown>;
+	},
+) {
+	return jsonFetch<{ basket: StellarBasketRecord; activity: BasketActivityEvent }>(
+		`/api/stellar/baskets/${encodeURIComponent(basketId)}/rebalances`,
+		{ method: "POST", body: JSON.stringify(input) },
 	);
 }
 

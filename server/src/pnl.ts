@@ -1,5 +1,3 @@
-import type { BasketDoc } from "./models.js";
-
 export type AllocationMark = {
 	symbol: string;
 	targetBps: number;
@@ -27,7 +25,16 @@ export type BasketPnl = {
  * marked by spot_now / spot_at_deposit.
  */
 export function computeBasketPnl(
-	basket: Pick<BasketDoc, "costBasisUsd" | "allocations">,
+	basket: {
+		costBasisUsd: number;
+		allocations: Array<{
+			symbol: string;
+			targetBps: number;
+			priceAtDepositUsd: number;
+			asset?: string;
+			diaKey?: string;
+		}>;
+	},
 	spotBySymbol: Record<string, number>,
 ): BasketPnl {
 	const cost = Math.max(0, basket.costBasisUsd);

@@ -5,6 +5,7 @@ import {
 	USDC_DECIMALS,
 	XLM_DECIMALS,
 	hasStellarToken,
+	stellarCanonicalSymbol,
 	stellarConfig,
 	stellarTokenAddress,
 } from "./config";
@@ -37,7 +38,11 @@ export type InvestBasketResult = {
 /** Equal-weight allocations for symbols that exist on the deployed vault. */
 export function buildAllocationsFromSymbols(symbols: string[]): VaultAllocation[] {
 	const unique = [
-		...new Set(symbols.map((s) => s.toUpperCase()).filter(hasStellarToken)),
+		...new Set(
+			symbols
+				.map((s) => stellarCanonicalSymbol(s))
+				.filter(hasStellarToken),
+		),
 	];
 	if (!unique.length) {
 		throw new Error(

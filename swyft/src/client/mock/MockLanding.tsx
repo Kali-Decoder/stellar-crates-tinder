@@ -1,10 +1,11 @@
 import {
 	ChevronDown,
 	ChevronRight,
-	CreditCard,
+	HandCoins,
 	Info,
 	Minus,
 	Plus,
+	Shield,
 	Wallet,
 } from "lucide-react";
 import {
@@ -28,8 +29,51 @@ import {
 } from "./landing-data";
 import { LandingBasketCard, LandingBasketDeck, TickerLogo } from "./LandingBasketDeck";
 import { StableTokenLabel } from "../components/StableTokenLabel";
-import { STELLAR_SUPPORTED_ASSET_COUNT } from "../stellar/config";
+import { STELLAR_SUPPORTED_ASSET_COUNT, stellarConfig } from "../stellar/config";
 import "./landing.css";
+
+const FEED_GROUPS: { label: string; symbols: string[] }[] = [
+	{
+		label: "Stocks",
+		symbols: [
+			"AAPL",
+			"AMD",
+			"AMZN",
+			"DIS",
+			"GOOG",
+			"JNJ",
+			"JPM",
+			"KO",
+			"META",
+			"MSFT",
+			"NFLX",
+			"NVDA",
+			"ORCL",
+			"PG",
+			"TSLA",
+			"V",
+			"WMT",
+			"XOM",
+		],
+	},
+	{
+		label: "ETFs",
+		symbols: ["IBIT", "IVV", "QQQ", "SPY", "TLT", "VOO"],
+	},
+	{
+		label: "Commodities",
+		symbols: ["NG", "WTI", "XAGG", "XAU"],
+	},
+	{
+		label: "FX",
+		symbols: ["EUR", "JPY"],
+	},
+];
+
+const LIVE_FEEDS = FEED_GROUPS.map((group) => ({
+	...group,
+	symbols: group.symbols.filter((symbol) => Boolean(stellarConfig.tokens[symbol])),
+})).filter((group) => group.symbols.length > 0);
 
 export function MockLanding({
 	onSignIn,
@@ -198,6 +242,80 @@ export function MockLanding({
 	);
 }
 
+function AnimatedChars({
+	text,
+	className,
+	baseDelayMs = 0,
+	stepMs = 28,
+}: {
+	text: string;
+	className?: string;
+	baseDelayMs?: number;
+	stepMs?: number;
+}) {
+	return (
+		<span className={className}>
+			{Array.from(text).map((char, index) => (
+				<span
+					key={`${char}-${index}`}
+					className="landing-anim-char"
+					style={
+						{
+							"--i": index,
+							"--base": `${baseDelayMs}ms`,
+							"--step": `${stepMs}ms`,
+						} as CSSProperties
+					}
+				>
+					{char === " " ? "\u00A0" : char}
+				</span>
+			))}
+		</span>
+	);
+}
+
+function AnimatedWords({
+	text,
+	className,
+	baseDelayMs = 0,
+	stepMs = 48,
+	emphasis,
+}: {
+	text: string;
+	className?: string;
+	baseDelayMs?: number;
+	stepMs?: number;
+	emphasis?: string;
+}) {
+	const words = text.split(" ");
+	return (
+		<span className={className}>
+			{words.map((word, index) => {
+				const clean = word.replace(/[.,]/g, "");
+				const isEm = Boolean(emphasis && clean === emphasis);
+				const Tag = isEm ? "em" : "span";
+				return (
+					<span key={`${word}-${index}`} className="landing-anim-word-wrap">
+						{index > 0 ? " " : null}
+						<Tag
+							className={`landing-anim-word${isEm ? " is-em" : ""}`}
+							style={
+								{
+									"--i": index,
+									"--base": `${baseDelayMs}ms`,
+									"--step": `${stepMs}ms`,
+								} as CSSProperties
+							}
+						>
+							{word}
+						</Tag>
+					</span>
+				);
+			})}
+		</span>
+	);
+}
+
 function HeroSection({
 	onSignIn,
 	signingIn,
@@ -211,16 +329,26 @@ function HeroSection({
 		<section className="landing-section landing-hero">
 			<div className="landing-copy">
 				<h1 className="landing-hero-title">
-					<span className="landing-hero-brand">swyft.fun</span>
-					<span className="landing-hero-lead">
-						non-custodial investing that feels like a{" "}
-						<em>swipe</em>, not a spreadsheet.
-					</span>
+					<AnimatedChars
+						text="swyft.fun"
+						className="landing-hero-brand"
+						baseDelayMs={40}
+						stepMs={32}
+					/>
+					<AnimatedWords
+						text="non-custodial investing that feels like a swipe, not a spreadsheet."
+						className="landing-hero-lead"
+						baseDelayMs={420}
+						stepMs={52}
+						emphasis="swipe"
+					/>
 				</h1>
-				<p className="landing-hero-sub">
-					Tokenized RWAs. Stellar settlement. Freighter signatures. Nothing leaves
-					your wallet without you.
-				</p>
+				<AnimatedWords
+					text="Tokenized RWAs. Stellar settlement. Freighter signatures. Nothing leaves your wallet without you."
+					className="landing-hero-sub"
+					baseDelayMs={980}
+					stepMs={36}
+				/>
 				<div className="landing-hero-actions">
 					<button
 						type="button"
@@ -255,8 +383,9 @@ function PerformanceSection() {
 			<header className="landing-section-head">
 				<h2>See what your money could have done.</h2>
 				<p>
-					Compare the USD value of local cash with 3-month U.S. T-Bills and real
-					swyft.fun portfolio histories.
+					Compare the USD value of local cash with illustrative swyft.fun
+					portfolio histories — then swipe the same {STELLAR_SUPPORTED_ASSET_COUNT}{" "}
+					DIA-priced assets live on Stellar.
 				</p>
 			</header>
 
@@ -331,6 +460,35 @@ function PerformanceSection() {
 					the USD value of the same starting local-currency balance; it is not an
 					inflation index. Portfolio performance is illustrative.
 				</p>
+
+				<div className="landing-feeds">
+					<div className="landing-feeds-head">
+						<span>Live vault feeds</span>
+						<small>
+							{STELLAR_SUPPORTED_ASSET_COUNT} DIA keys · <StableTokenLabel token="USDC" />{" "}
+							settlement
+						</small>
+					</div>
+					{LIVE_FEEDS.map((group) => (
+						<div key={group.label} className="landing-feeds-group">
+							<strong>{group.label}</strong>
+							<ul>
+								{group.symbols.map((symbol) => (
+									<li key={symbol}>
+										<span className="landing-feed-mark" aria-hidden="true">
+											<TickerLogo symbol={symbol} />
+										</span>
+										<code>{symbol}/USD</code>
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+					<p className="landing-feeds-foot">
+						Plus <code>USDC/USD</code> for vault settlement. Oracle updater keeps
+						spots fresh on testnet.
+					</p>
+				</div>
 			</div>
 		</section>
 	);
@@ -561,20 +719,35 @@ function AiPortfolioSection({ onSignIn }: { onSignIn: () => void }) {
 function MoneyFlowSection() {
 	const ref = useRef<HTMLElement>(null);
 	const inView = useInView(ref);
-	const [payIndex, setPayIndex] = useState(2);
+	const [stepIndex, setStepIndex] = useState(0);
 
 	useEffect(() => {
 		if (!inView) return;
 		const timer = window.setInterval(() => {
-			setPayIndex((value) => (value + 1) % 3);
+			setStepIndex((value) => (value + 1) % 3);
 		}, 2200);
 		return () => window.clearInterval(timer);
 	}, [inView]);
 
-	const methods = [
-		{ id: "card", title: "Bank card", sub: "Visa or Mastercard" },
-		{ id: "transfer", title: "Bank transfer", sub: "From your bank account" },
-		{ id: "stable", title: "Stablecoins", sub: "USDC on Stellar" },
+	const steps = [
+		{
+			id: "wallet",
+			title: "Connect Freighter",
+			sub: "Stellar testnet wallet",
+			mark: null as "USDC" | "XLM" | null,
+		},
+		{
+			id: "fund",
+			title: "Get testnet USDC",
+			sub: "Friendbot XLM + faucet mint",
+			mark: "USDC" as const,
+		},
+		{
+			id: "invest",
+			title: "Swipe & deposit",
+			sub: "Approve in Freighter → vault shares",
+			mark: null as "USDC" | "XLM" | null,
+		},
 	] as const;
 
 	return (
@@ -582,37 +755,51 @@ function MoneyFlowSection() {
 			ref={ref}
 			className={`landing-section landing-money landing-reveal${inView ? " is-in" : ""}`}
 		>
-			<h2>Money in, money out. It&apos;s that easy.</h2>
+			<h2>Fund, swipe, settle. Still non-custodial.</h2>
 			<div className="landing-money-grid">
 				<article className="landing-money-card">
 					<span className="landing-money-kicker">
-						<CreditCard size={14} /> Payment methods
+						<HandCoins size={14} /> How funding works
 					</span>
-					<h3>Add money from anywhere.</h3>
-					<p>Top up with a bank card, bank transfer, or stablecoins.</p>
+					<h3>Money in — three Freighter steps.</h3>
+					<p>
+						Connect on Stellar testnet, mint USDC from the faucet, then deposit
+						into your personal vault bucket.
+					</p>
 					<ul className="landing-pay-list">
-						{methods.map((method, index) => (
+						{steps.map((step, index) => (
 							<li
-								key={method.id}
-								className={index === payIndex ? "is-active" : ""}
+								key={step.id}
+								className={index === stepIndex ? "is-active" : ""}
 							>
 								<div>
-									<b>{method.title}</b>
+									<b>
+										<span className="landing-step-num">{index + 1}</span>
+										{step.title}
+									</b>
 									<small>
-										{method.id === "stable" ? (
+										{step.mark === "USDC" ? (
 											<>
-												<StableTokenLabel token="USDC" /> on Stellar
+												<StableTokenLabel token="USDC" /> via faucet
 											</>
 										) : (
-											method.sub
+											step.sub
 										)}
 									</small>
 								</div>
-								{method.id === "stable" ? (
+								{step.mark ? (
 									<span className="landing-pay-marks" aria-hidden="true">
-										<TickerLogo symbol="USDC" />
+										<TickerLogo symbol={step.mark} />
 									</span>
-								) : null}
+								) : step.id === "wallet" ? (
+									<span className="landing-pay-marks is-icon" aria-hidden="true">
+										<Wallet size={16} strokeWidth={2.2} />
+									</span>
+								) : (
+									<span className="landing-pay-marks is-icon" aria-hidden="true">
+										<Shield size={16} strokeWidth={2.2} />
+									</span>
+								)}
 							</li>
 						))}
 					</ul>
@@ -620,18 +807,23 @@ function MoneyFlowSection() {
 
 				<article className="landing-money-card">
 					<span className="landing-money-kicker">
-						<Wallet size={14} /> Your money, your rules
+						<Shield size={14} /> Your keys, your baskets
 					</span>
-					<h3>Withdraw anytime.</h3>
-					<p>Move funds back to your bank or Stellar wallet when you need.</p>
+					<h3>Money out — back to your wallet.</h3>
+					<p>
+						Shares live in Freighter. Withdraw returns USDC to you — swyft never
+						holds custody.
+					</p>
 					<div className={`landing-ring${inView ? " is-drawn" : ""}`}>
 						<svg viewBox="0 0 120 120" aria-hidden="true">
 							<circle cx="60" cy="60" r="46" className="landing-ring-track" />
 							<circle cx="60" cy="60" r="46" className="landing-ring-value" />
 						</svg>
 						<div>
-							<strong>$500</strong>
-							<small>available</small>
+							<strong>Non-custodial</strong>
+							<small>
+								<StableTokenLabel token="USDC" /> stays in Freighter
+							</small>
 						</div>
 					</div>
 				</article>
@@ -661,8 +853,11 @@ function CtaBanner({
 		>
 			<div className="landing-banner-inner">
 				<div className="landing-banner-copy">
-					<h2>Build your first portfolio in 2 minutes.</h2>
-					<p>No minimum amount required. Available 24/7 on Stellar.</p>
+					<h2>Build your first basket in minutes.</h2>
+					<p>
+						Freighter on Stellar testnet. Swipe RWAs, deposit{" "}
+						<StableTokenLabel token="USDC" />, hold vault shares.
+					</p>
 					<button
 						type="button"
 						className="landing-banner-cta"

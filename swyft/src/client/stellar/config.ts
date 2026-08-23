@@ -31,10 +31,13 @@ export const USDC_DECIMALS = 7;
 /** Native XLM uses 7 decimals (stroops). */
 export const XLM_DECIMALS = 7;
 
-export function stellarTokenAddress(symbol: string): string | undefined {
+export function stellarCanonicalSymbol(symbol: string): string {
 	const key = symbol.toUpperCase();
-	const aliased = key === "GOOGL" ? "GOOG" : key;
-	return stellarConfig.tokens[aliased];
+	return key === "GOOGL" ? "GOOG" : key;
+}
+
+export function stellarTokenAddress(symbol: string): string | undefined {
+	return stellarConfig.tokens[stellarCanonicalSymbol(symbol)];
 }
 
 export function hasStellarToken(symbol: string): boolean {

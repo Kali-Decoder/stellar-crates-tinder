@@ -243,7 +243,9 @@ export function MockAccount({
 						<em>Stellar testnet</em>
 					</div>
 					<div className="trader-balance-card">
-						<small>XLM</small>
+						<small>
+							<StableTokenLabel token="XLM" />
+						</small>
 						<strong>
 							{xlmBaseUnits === undefined
 								? balancesLoading

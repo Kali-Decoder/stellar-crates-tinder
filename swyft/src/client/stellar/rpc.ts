@@ -79,7 +79,12 @@ export async function invokeContract<T = unknown>(params: {
 
 	const final = await waitForTx(sent.hash);
 	if (final.status !== "SUCCESS") {
-		throw new Error(`Transaction ${sent.hash} ended as ${final.status}`);
+		const detail = formatTxFailure(final);
+		throw new Error(
+			detail
+				? `Transaction ${sent.hash} ended as ${final.status}: ${detail}`
+				: `Transaction ${sent.hash} ended as ${final.status}`,
+		);
 	}
 
 	const returnValue = final.returnValue
@@ -98,6 +103,36 @@ async function waitForTx(hash: string, timeoutMs = 90_000) {
 		latest = await rpcServer.getTransaction(hash);
 	}
 	return latest;
+}
+
+function formatTxFailure(tx: Awaited<ReturnType<typeof waitForTx>>): string {
+	const events =
+		"diagnosticEventsXdr" in tx && Array.isArray(tx.diagnosticEventsXdr)
+			? tx.diagnosticEventsXdr
+			: [];
+	for (const raw of events) {
+		try {
+			const diagnostic = xdr.DiagnosticEvent.fromXDR(raw, "base64");
+			if (diagnostic.inSuccessfulContractCall()) continue;
+			const topics = diagnostic.event().body().value().topics();
+			const labels = topics.map((topic) => {
+				const kind = topic.switch().name;
+				if (kind === "scvSymbol") return topic.sym().toString();
+				if (kind === "scvString") return topic.str().toString();
+				if (kind === "scvError") {
+					const err = topic.error();
+					return `${err.switch().name}:${err.switch().value}`;
+				}
+				return kind;
+			});
+			if (labels.includes("error") || labels.includes("host_fn_failed")) {
+				return labels.join(" ");
+			}
+		} catch {
+			/* ignore malformed diagnostics */
+		}
+	}
+	return "";
 }
 
 export function addressScVal(id: string) {

@@ -188,6 +188,7 @@ export function MockReview({
 					createTxHash: result.createHash,
 					approveTxHash: result.approveHash,
 					depositTxHash: result.depositHash,
+					tags: ["invest", "freighter", "swyft"],
 				});
 			} catch (persistError) {
 				console.warn("Basket portfolio persist failed", persistError);

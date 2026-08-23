@@ -80,6 +80,33 @@ export function createStellarPortfolioRouter(): Router {
 		void send(response, () => h.closeBasket(String(request.params.id))),
 	);
 
+	router.post(
+		"/baskets/:id/rebalances",
+		(request: Request, response: Response) =>
+			void send(response, () =>
+				h.recordRebalance(String(request.params.id), request.body),
+			),
+	);
+
+	router.get(
+		"/wallets/:wallet/activity",
+		(request: Request, response: Response) => {
+			const kind = request.query.kind
+				? String(request.query.kind)
+				: undefined;
+			const limit = request.query.limit
+				? Number(request.query.limit)
+				: undefined;
+			void send(response, () =>
+				h.listActivity(String(request.params.wallet), { kind, limit }),
+			);
+		},
+	);
+
+	router.post("/activity", (request, response) =>
+		void send(response, () => h.recordActivity(request.body)),
+	);
+
 	router.get("/health", (_request, response) => {
 		response.json({
 			ok: true,

@@ -26,6 +26,14 @@ export function TickerLogo({ symbol }: { symbol: string }) {
 			/>
 		);
 	}
+	if (upper === "XLM") {
+		return (
+			<img
+				src="/assets/tokens/xlm.png"
+				alt=""
+			/>
+		);
+	}
 	if (failed) {
 		return <span className="landing-logo-fallback">{symbol.slice(0, 1)}</span>;
 	}

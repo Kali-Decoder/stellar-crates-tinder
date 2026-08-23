@@ -1,6 +1,11 @@
 import { z } from "zod";
+import {
+	appendActivity,
+	listActivityForWallet,
+	toPublicActivity,
+} from "./activity.js";
 import { computeBasketPnl } from "./pnl.js";
-import { BasketModel, type BasketDoc } from "./models.js";
+import { ActivityModel, BasketModel, type BasketDoc } from "./models.js";
 import { isMongoReady } from "./mongo.js";
 
 const allocationInput = z.object({
@@ -23,12 +28,41 @@ const createBasketBody = z.object({
 	approveTxHash: z.string().optional().default(""),
 	depositTxHash: z.string().optional().default(""),
 	notes: z.string().optional().default(""),
+	tags: z.array(z.string()).optional(),
 });
 
 const ledgerBody = z.object({
 	usdAmount: z.number().positive(),
 	shares: z.string().min(1),
 	txHash: z.string().optional().default(""),
+	tags: z.array(z.string()).optional(),
+});
+
+const rebalanceBody = z.object({
+	txHash: z.string().min(1),
+	tags: z.array(z.string()).optional(),
+	meta: z.record(z.string(), z.unknown()).optional(),
+});
+
+const activityBody = z.object({
+	ownerWallet: z.string().regex(/^G[A-Z0-9]{55}$/),
+	basketId: z.string().optional().default(""),
+	bucketId: z.number().int().nonnegative(),
+	vaultAddress: z.string().min(1),
+	basketName: z.string().optional().default(""),
+	kind: z.enum([
+		"create",
+		"approve",
+		"deposit",
+		"withdraw",
+		"rebalance",
+		"close",
+	]),
+	tags: z.array(z.string()).optional(),
+	usdAmount: z.number().optional().default(0),
+	shares: z.string().optional().default(""),
+	txHash: z.string().optional().default(""),
+	meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** In-memory fallback when MONGODB_URI is unset (local mock). */
@@ -93,7 +127,13 @@ export type PortfolioHandlers = {
 	walletPortfolio: (wallet: string) => Promise<{ status: number; body: unknown }>;
 	recordDeposit: (id: string, raw: unknown) => Promise<{ status: number; body: unknown }>;
 	recordWithdraw: (id: string, raw: unknown) => Promise<{ status: number; body: unknown }>;
+	recordRebalance: (id: string, raw: unknown) => Promise<{ status: number; body: unknown }>;
 	closeBasket: (id: string) => Promise<{ status: number; body: unknown }>;
+	listActivity: (
+		wallet: string,
+		opts?: { kind?: string; limit?: number },
+	) => Promise<{ status: number; body: unknown }>;
+	recordActivity: (raw: unknown) => Promise<{ status: number; body: unknown }>;
 };
 
 export function createPortfolioHandlers(): PortfolioHandlers {
@@ -108,6 +148,7 @@ export function createPortfolioHandlers(): PortfolioHandlers {
 				return { status: 400, body: { error: "allocations must sum to 10000 bps" } };
 			}
 
+			const symbols = parsed.data.allocations.map((a) => a.symbol.toUpperCase());
 			const doc = {
 				ownerWallet: parsed.data.ownerWallet,
 				bucketId: parsed.data.bucketId,
@@ -137,10 +178,11 @@ export function createPortfolioHandlers(): PortfolioHandlers {
 				updatedAt: new Date(),
 			};
 
+			let publicBasket: ReturnType<typeof toPublic>;
 			if (isMongoReady()) {
 				try {
 					const created = await BasketModel.create(doc);
-					return { status: 201, body: toPublic(created) };
+					publicBasket = toPublic(created);
 				} catch (err) {
 					const message = err instanceof Error ? err.message : "create failed";
 					if (message.includes("duplicate") || message.includes("E11000")) {
@@ -148,12 +190,63 @@ export function createPortfolioHandlers(): PortfolioHandlers {
 					}
 					return { status: 500, body: { error: message } };
 				}
+			} else {
+				const id = `mem_${parsed.data.ownerWallet.slice(0, 8)}_${parsed.data.bucketId}_${Date.now()}`;
+				const stored = {
+					...doc,
+					_id: { toString: () => id },
+				} as BasketDoc & { _id: { toString(): string } };
+				memoryById.set(id, stored);
+				publicBasket = toPublic(stored);
 			}
 
-			const id = `mem_${parsed.data.ownerWallet.slice(0, 8)}_${parsed.data.bucketId}_${Date.now()}`;
-			const stored = { ...doc, _id: { toString: () => id } };
-			memoryById.set(id, stored);
-			return { status: 201, body: toPublic(stored) };
+			const baseTags = parsed.data.tags ?? [];
+			const meta = {
+				symbols,
+				notes: parsed.data.notes || undefined,
+			};
+			await Promise.all([
+				appendActivity({
+					ownerWallet: publicBasket.ownerWallet,
+					basketId: publicBasket.id,
+					bucketId: publicBasket.bucketId,
+					vaultAddress: publicBasket.vaultAddress,
+					basketName: publicBasket.name,
+					kind: "create",
+					tags: [...baseTags, "basket", "create", "initial"],
+					txHash: publicBasket.createTxHash,
+					meta,
+					at: publicBasket.createdAt,
+				}),
+				appendActivity({
+					ownerWallet: publicBasket.ownerWallet,
+					basketId: publicBasket.id,
+					bucketId: publicBasket.bucketId,
+					vaultAddress: publicBasket.vaultAddress,
+					basketName: publicBasket.name,
+					kind: "approve",
+					tags: [...baseTags, "basket", "approve", "usdc"],
+					txHash: publicBasket.approveTxHash,
+					meta,
+					at: publicBasket.createdAt,
+				}),
+				appendActivity({
+					ownerWallet: publicBasket.ownerWallet,
+					basketId: publicBasket.id,
+					bucketId: publicBasket.bucketId,
+					vaultAddress: publicBasket.vaultAddress,
+					basketName: publicBasket.name,
+					kind: "deposit",
+					tags: [...baseTags, "basket", "deposit", "initial"],
+					usdAmount: parsed.data.depositUsd,
+					shares: parsed.data.shares,
+					txHash: publicBasket.depositTxHash,
+					meta,
+					at: publicBasket.createdAt,
+				}),
+			]);
+
+			return { status: 201, body: publicBasket };
 		},
 
 		async listBaskets(wallet, status) {
@@ -261,7 +354,20 @@ export function createPortfolioHandlers(): PortfolioHandlers {
 			});
 			doc.updatedAt = new Date();
 			await saveDoc(doc);
-			return { status: 200, body: toPublic(doc) };
+			const publicBasket = toPublic(doc);
+			await appendActivity({
+				ownerWallet: publicBasket.ownerWallet,
+				basketId: publicBasket.id,
+				bucketId: publicBasket.bucketId,
+				vaultAddress: publicBasket.vaultAddress,
+				basketName: publicBasket.name,
+				kind: "deposit",
+				tags: [...(parsed.data.tags ?? []), "basket", "deposit"],
+				usdAmount: parsed.data.usdAmount,
+				shares: parsed.data.shares,
+				txHash: parsed.data.txHash,
+			});
+			return { status: 200, body: publicBasket };
 		},
 
 		async recordWithdraw(id, raw) {
@@ -289,7 +395,62 @@ export function createPortfolioHandlers(): PortfolioHandlers {
 			}
 			doc.updatedAt = new Date();
 			await saveDoc(doc);
-			return { status: 200, body: toPublic(doc) };
+			const publicBasket = toPublic(doc);
+			await appendActivity({
+				ownerWallet: publicBasket.ownerWallet,
+				basketId: publicBasket.id,
+				bucketId: publicBasket.bucketId,
+				vaultAddress: publicBasket.vaultAddress,
+				basketName: publicBasket.name,
+				kind: "withdraw",
+				tags: [...(parsed.data.tags ?? []), "basket", "withdraw"],
+				usdAmount: parsed.data.usdAmount,
+				shares: parsed.data.shares,
+				txHash: parsed.data.txHash,
+			});
+			if (publicBasket.status === "closed") {
+				await appendActivity({
+					ownerWallet: publicBasket.ownerWallet,
+					basketId: publicBasket.id,
+					bucketId: publicBasket.bucketId,
+					vaultAddress: publicBasket.vaultAddress,
+					basketName: publicBasket.name,
+					kind: "close",
+					tags: ["basket", "close", "auto"],
+					txHash: parsed.data.txHash
+						? `${parsed.data.txHash}:close`
+						: `close:${publicBasket.id}`,
+					meta: { reason: "shares_depleted" },
+				});
+			}
+			return { status: 200, body: publicBasket };
+		},
+
+		async recordRebalance(id, raw) {
+			const parsed = rebalanceBody.safeParse(raw);
+			if (!parsed.success) {
+				return { status: 400, body: { error: parsed.error.flatten() } };
+			}
+			const doc = await loadById(id);
+			if (!doc) return { status: 404, body: { error: "basket not found" } };
+			if (doc.status !== "active") {
+				return { status: 400, body: { error: "basket is closed" } };
+			}
+			doc.updatedAt = new Date();
+			await saveDoc(doc);
+			const publicBasket = toPublic(doc);
+			const event = await appendActivity({
+				ownerWallet: publicBasket.ownerWallet,
+				basketId: publicBasket.id,
+				bucketId: publicBasket.bucketId,
+				vaultAddress: publicBasket.vaultAddress,
+				basketName: publicBasket.name,
+				kind: "rebalance",
+				tags: [...(parsed.data.tags ?? []), "basket", "rebalance"],
+				txHash: parsed.data.txHash,
+				meta: parsed.data.meta,
+			});
+			return { status: 200, body: { basket: publicBasket, activity: event } };
 		},
 
 		async closeBasket(id) {
@@ -298,9 +459,133 @@ export function createPortfolioHandlers(): PortfolioHandlers {
 			doc.status = "closed";
 			doc.updatedAt = new Date();
 			await saveDoc(doc);
-			return { status: 200, body: toPublic(doc) };
+			const publicBasket = toPublic(doc);
+			await appendActivity({
+				ownerWallet: publicBasket.ownerWallet,
+				basketId: publicBasket.id,
+				bucketId: publicBasket.bucketId,
+				vaultAddress: publicBasket.vaultAddress,
+				basketName: publicBasket.name,
+				kind: "close",
+				tags: ["basket", "close"],
+			});
+			return { status: 200, body: publicBasket };
+		},
+
+		async listActivity(wallet, opts) {
+			if (!/^G[A-Z0-9]{55}$/.test(wallet)) {
+				return { status: 400, body: { error: "invalid stellar address" } };
+			}
+			let events = await listActivityForWallet(wallet, opts);
+			if (events.length === 0) {
+				events = await backfillFromBaskets(wallet);
+			}
+			return {
+				status: 200,
+				body: {
+					wallet,
+					count: events.length,
+					events,
+				},
+			};
+		},
+
+		async recordActivity(raw) {
+			const parsed = activityBody.safeParse(raw);
+			if (!parsed.success) {
+				return { status: 400, body: { error: parsed.error.flatten() } };
+			}
+			const event = await appendActivity(parsed.data);
+			return { status: 201, body: event };
 		},
 	};
+}
+
+async function backfillFromBaskets(wallet: string) {
+	const listed = await createPortfolioHandlers().listBaskets(wallet);
+	if (listed.status !== 200) return [];
+	const body = listed.body as { baskets: ReturnType<typeof toPublic>[] };
+	const synthesized: ReturnType<typeof toPublicActivity>[] = [];
+
+	for (const basket of body.baskets) {
+		const symbols = basket.allocations.map((a) => a.symbol);
+		const meta = { symbols, backfill: true };
+		if (basket.createTxHash) {
+			synthesized.push(
+				await appendActivity({
+					ownerWallet: wallet,
+					basketId: basket.id,
+					bucketId: basket.bucketId,
+					vaultAddress: basket.vaultAddress,
+					basketName: basket.name,
+					kind: "create",
+					tags: ["basket", "create", "backfill"],
+					txHash: basket.createTxHash,
+					meta,
+					at: new Date(basket.createdAt),
+				}),
+			);
+		}
+		if (basket.approveTxHash) {
+			synthesized.push(
+				await appendActivity({
+					ownerWallet: wallet,
+					basketId: basket.id,
+					bucketId: basket.bucketId,
+					vaultAddress: basket.vaultAddress,
+					basketName: basket.name,
+					kind: "approve",
+					tags: ["basket", "approve", "usdc", "backfill"],
+					txHash: basket.approveTxHash,
+					meta,
+					at: new Date(basket.createdAt),
+				}),
+			);
+		}
+		for (const entry of basket.ledger ?? []) {
+			synthesized.push(
+				await appendActivity({
+					ownerWallet: wallet,
+					basketId: basket.id,
+					bucketId: basket.bucketId,
+					vaultAddress: basket.vaultAddress,
+					basketName: basket.name,
+					kind: entry.kind,
+					tags: [
+						"basket",
+						entry.kind,
+						entry.kind === "deposit" && entry.txHash === basket.depositTxHash
+							? "initial"
+							: "backfill",
+					].filter(Boolean) as string[],
+					usdAmount: entry.usdAmount,
+					shares: entry.shares,
+					txHash: entry.txHash,
+					meta,
+					at: new Date(entry.at),
+				}),
+			);
+		}
+		if (basket.status === "closed") {
+			synthesized.push(
+				await appendActivity({
+					ownerWallet: wallet,
+					basketId: basket.id,
+					bucketId: basket.bucketId,
+					vaultAddress: basket.vaultAddress,
+					basketName: basket.name,
+					kind: "close",
+					tags: ["basket", "close", "backfill"],
+					txHash: `close:${basket.id}`,
+					at: new Date(basket.updatedAt),
+				}),
+			);
+		}
+	}
+
+	return synthesized.sort(
+		(a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+	);
 }
 
 async function loadById(id: string) {
@@ -329,4 +614,9 @@ function subShares(a: string, b: string) {
 
 function round2(n: number) {
 	return Math.round(n * 100) / 100;
+}
+
+/** Used by health / tests — ensure model is referenced when Mongo is up. */
+export function activityModelReady() {
+	return Boolean(ActivityModel);
 }
