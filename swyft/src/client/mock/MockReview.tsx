@@ -1,5 +1,5 @@
 import { LoaderCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import type { Candidate } from "../../domain/schemas";
 import { formatTicketSizeUsd } from "../../domain/schemas";
@@ -11,6 +11,7 @@ import type {
 import { api } from "../api";
 import { AssetMark } from "../components/AssetMark";
 import { ArrowRight, Check, Close, Shield } from "../components/Icons";
+import { StableTokenLabel } from "../components/StableTokenLabel";
 import { explorerTxUrl, stellarConfig, USDC_DECIMALS } from "../stellar/config";
 import {
 	buildAllocationsFromSymbols,
@@ -58,6 +59,12 @@ export function MockReview({
 	const [now, setNow] = useState(() => Date.now());
 	const total = Math.round(selected.length * ticketSizeUsd * 100) / 100;
 	const stableToken = "USDC";
+	const assetIdsKey = selected.map((item) => item.assetId).join("|");
+	const selectedRef = useRef(selected);
+	selectedRef.current = selected;
+	const onExecutionChangeRef = useRef(onExecutionChange);
+	onExecutionChangeRef.current = onExecutionChange;
+	const prepareAttempt = useRef(0);
 
 	const onchainSymbols = useMemo(
 		() => selected.map((c) => c.symbol).filter(hasStellarToken),
@@ -67,42 +74,50 @@ export function MockReview({
 	const canGoOnchain = onchainSymbols.length > 0;
 
 	const prepare = useCallback(async () => {
-		if (!selected.length) {
+		const currentSelected = selectedRef.current;
+		if (!currentSelected.length) {
 			setError("Choose at least one asset before refreshing quotes.");
+			setLoading(false);
+			setPhase("idle");
 			return;
 		}
+		const attempt = ++prepareAttempt.current;
 		setLoading(true);
 		setPhase("refreshing");
 		setError("");
 		try {
 			const prepared = await api.prepareExecution(
 				session.id,
-				selected.map((item) => item.assetId),
+				currentSelected.map((item) => item.assetId),
 				ticketSizeUsd,
 				periodLimitUsd,
 				activeChain,
 			);
+			if (attempt !== prepareAttempt.current) return;
 			setRecord(prepared);
-			onExecutionChange(prepared);
+			onExecutionChangeRef.current(prepared);
 		} catch (caught) {
+			if (attempt !== prepareAttempt.current) return;
+			const raw =
+				caught instanceof Error ? caught.message : "Could not prepare basket";
 			setError(
-				caught instanceof Error ? caught.message : "Could not prepare basket",
+				raw === "SESSION_NOT_FOUND"
+					? "This basket session expired. Tap Refresh quotes, or go back and open a new basket."
+					: raw,
 			);
 		} finally {
-			setLoading(false);
-			setPhase("idle");
+			if (attempt === prepareAttempt.current) {
+				setLoading(false);
+				setPhase("idle");
+			}
 		}
-	}, [
-		activeChain,
-		onExecutionChange,
-		periodLimitUsd,
-		selected,
-		session.id,
-		ticketSizeUsd,
-	]);
+	}, [activeChain, assetIdsKey, periodLimitUsd, session.id, ticketSizeUsd]);
 
 	useEffect(() => {
 		void prepare();
+		return () => {
+			prepareAttempt.current += 1;
+		};
 	}, [prepare]);
 
 	useEffect(() => {
@@ -292,7 +307,8 @@ export function MockReview({
 									<div>
 										<dt>In</dt>
 										<dd>
-											{formatTicketSizeUsd(ticketSizeUsd)} {stableToken}
+											{formatTicketSizeUsd(ticketSizeUsd)}{" "}
+											<StableTokenLabel token={stableToken} />
 										</dd>
 									</div>
 									<div>
@@ -326,9 +342,14 @@ export function MockReview({
 					<h2>Confirm allocation</h2>
 					<p>
 						Wallet{" "}
-						{walletBalance !== undefined
-							? `${walletBalance.toFixed(2)} ${stableToken}`
-							: "…"}{" "}
+						{walletBalance !== undefined ? (
+							<>
+								{walletBalance.toFixed(2)}{" "}
+								<StableTokenLabel token={stableToken} />
+							</>
+						) : (
+							"…"
+						)}{" "}
 						· Quote {Math.ceil(quoteExpiry / 1000)}s
 					</p>
 				</header>
@@ -336,7 +357,8 @@ export function MockReview({
 					<div>
 						<dt>Spend</dt>
 						<dd>
-							{formatTicketSizeUsd(total)} {stableToken}
+							{formatTicketSizeUsd(total)}{" "}
+							<StableTokenLabel token={stableToken} />
 						</dd>
 					</div>
 					<div>
@@ -348,7 +370,8 @@ export function MockReview({
 					<div>
 						<dt>Remaining budget</dt>
 						<dd>
-							{formatTicketSizeUsd(periodLimitUsd - total)} {stableToken}
+							{formatTicketSizeUsd(periodLimitUsd - total)}{" "}
+							<StableTokenLabel token={stableToken} />
 						</dd>
 					</div>
 				</dl>
@@ -400,8 +423,8 @@ export function MockReview({
 							</>
 						) : (
 							<>
-								Invest on Stellar {formatTicketSizeUsd(total)} {stableToken}{" "}
-								<Check />
+								Invest on Stellar {formatTicketSizeUsd(total)}{" "}
+								<StableTokenLabel token={stableToken} /> <Check />
 							</>
 						)}
 					</button>

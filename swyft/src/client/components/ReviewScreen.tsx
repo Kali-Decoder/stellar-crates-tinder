@@ -22,6 +22,7 @@ import {
 } from "../review-safety";
 import { AssetMark } from "./AssetMark";
 import { ArrowRight, Check, Close, Shield } from "./Icons";
+import { StableTokenLabel } from "./StableTokenLabel";
 
 const MIN_SIGNING_WINDOW_MS = 10_000;
 
@@ -573,7 +574,7 @@ export function ReviewScreen({
 								</span>
 								<span>
 									<strong>{formatTicketSizeUsd(ticketSizeUsd)}</strong>{" "}
-									{stableToken}
+									<StableTokenLabel token={stableToken} />
 								</span>
 								<span>
 									<strong>
@@ -618,14 +619,19 @@ export function ReviewScreen({
 								: formatTicketSizeUsd(walletBalance)}
 						</strong>
 						<small>
-							<b>{stableToken}</b>
+							<b>
+								<StableTokenLabel token={stableToken} />
+							</b>
 						</small>
 					</div>
 					<div>
 						<span>Total input</span>
 						<strong>{formatTicketSizeUsd(total)}</strong>
 						<small>
-							<b>{stableToken}</b> to invest
+							<b>
+								<StableTokenLabel token={stableToken} />
+							</b>{" "}
+							to invest
 						</small>
 					</div>
 					<div>
@@ -636,7 +642,9 @@ export function ReviewScreen({
 							)}
 						</strong>
 						<small>
-							<b>{stableToken}</b>
+							<b>
+								<StableTokenLabel token={stableToken} />
+							</b>
 						</small>
 					</div>
 				</div>
@@ -665,7 +673,13 @@ export function ReviewScreen({
 					},
 					{
 						label: "Budget within limit",
-						value: `${formatTicketSizeUsd(total)} / ${formatTicketSizeUsd(periodLimitUsd)} ${stableToken}`,
+						value: (
+							<>
+								{formatTicketSizeUsd(total)} /{" "}
+								{formatTicketSizeUsd(periodLimitUsd)}{" "}
+								<StableTokenLabel token={stableToken} />
+							</>
+						),
 						ok: selected.length > 0,
 					},
 					{
@@ -852,7 +866,12 @@ export function ReviewScreen({
 										: !quotesSafeToSign
 											? "Refresh quotes"
 											: hasExecutableTransaction
-												? `Sign & invest ${formatTicketSizeUsd(total)} ${stableToken}`
+												? (
+														<>
+															Sign &amp; invest {formatTicketSizeUsd(total)}{" "}
+															<StableTokenLabel token={stableToken} />
+														</>
+													)
 												: "Simulate wallet confirmation"}{" "}
 							{loading ? (
 								<LoaderCircle className="button-spinner" />

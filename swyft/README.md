@@ -23,6 +23,8 @@ npm run test:contracts
 
 Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit-Tech/Stellar-Wallets-Kit) (Freighter) on Testnet.
 
+Product docs in the UI: click **Docs**. Written guide: [`docs/PRODUCT_GUIDE.md`](./docs/PRODUCT_GUIDE.md).
+
 ## Repository layout
 
 | Path | What it is |
@@ -34,7 +36,8 @@ Wallet connect uses [`@creit.tech/stellar-wallets-kit`](https://github.com/Creit
 | `src/domain/` | Shared schemas, budgets, tags, policy helpers |
 | `contracts/` | Soroban workspace: `bucket-vault`, `share-token`, `dia-oracle` |
 | `scripts/` | Deploy, oracle fetch/update, create-bucket helpers |
-| `docs/` | Architecture, user flow, contracts flow, checklists |
+| `docs/` | Architecture, user flow, contracts, **PRODUCT_GUIDE** |
+| In-app **Docs** | Landing header/footer + primary nav after sign-in |
 | `tests/` | Vitest for client/domain still used by the UI |
 
 Set `MONGODB_URI` in `../server/.env` (or `swyft/.env`) for persistence. Without it the API uses an in-memory store.

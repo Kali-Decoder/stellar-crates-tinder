@@ -38,6 +38,7 @@ import { Confetti } from "./components/magicui/confetti";
 import { Onboarding } from "./components/Onboarding";
 import { PositionsScreen } from "./components/PositionsScreen";
 import { ReceiptScreen } from "./components/ReceiptScreen";
+import { DocsScreen } from "./components/DocsScreen";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { SwipeCard } from "./components/SwipeCard";
 import {
@@ -45,7 +46,7 @@ import {
 	writeAccountPreferences,
 } from "./preferences-storage";
 
-type View = "week" | "positions" | "receipts" | "account";
+type View = "week" | "positions" | "receipts" | "account" | "docs";
 type Stage = "loading" | "onboarding" | "swipe" | "review";
 type DecisionFeedback = "invest" | "skip";
 const LAST_EXECUTION_KEY = "investmade:last-execution";
@@ -352,10 +353,8 @@ export function App({ config }: { config: PublicConfig }) {
 
 	useEffect(() => {
 		if (!nextAssetId) return;
-		void Promise.all([
-			api.assetHistory(nextAssetId, "ALL"),
-			api.assetHistory(nextAssetId, "1M"),
-		]).catch(() => undefined);
+		// Prefetch default chart only — Yahoo rate-limits aggressive multi-range pulls.
+		void api.assetHistory(nextAssetId, "1M").catch(() => undefined);
 	}, [nextAssetId]);
 
 	const recoverReviewSession = useCallback(async () => {
@@ -618,6 +617,8 @@ export function App({ config }: { config: PublicConfig }) {
 						activeChain={activeChain}
 						solanaWallet={selectedSolanaWallet}
 					/>
+				) : view === "docs" ? (
+					<DocsScreen onBack={() => setView("week")} />
 				) : view === "account" && preferences ? (
 					<AccountScreen
 						wallet={wallet}

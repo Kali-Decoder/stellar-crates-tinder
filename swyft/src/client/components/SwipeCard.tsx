@@ -7,7 +7,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { visibleAssetTags } from "../../domain/asset-tag-config";
 import type { Candidate } from "../../domain/schemas";
 import {
 	type AssetDetailsResponse,
@@ -31,7 +30,15 @@ import {
 	isHistoryPeriodAvailable,
 } from "../chart-history";
 import { formatChartAxisUsdPrice, formatUsdPrice } from "../price-format";
+import {
+	type DiaFeedInfo,
+	diaFeedAgeSec,
+	fetchDiaFeedInfo,
+	formatDiaClock,
+	formatDiaUpdatedAt,
+} from "../stellar/dia-api";
 import { AssetMark } from "./AssetMark";
+import { StableTokenLabel } from "./StableTokenLabel";
 
 const SWIPE_THRESHOLD_PX = 72;
 const LOADING_DOTS = Array.from({ length: 32 }, (_, index) => index);
@@ -65,12 +72,6 @@ const compactUsdFormatter = new Intl.NumberFormat("en-US", {
 	notation: "compact",
 	maximumFractionDigits: 2,
 });
-
-function formatCount(value: number | undefined) {
-	return value
-		? new Intl.NumberFormat("en-US", { notation: "compact" }).format(value)
-		: undefined;
-}
 
 function ChartShape({
 	points,
@@ -266,10 +267,34 @@ function PriceSparkline({
 	const [retryCount, setRetryCount] = useState(0);
 	const [details, setDetails] = useState<AssetDetailsResponse>();
 	const [detailsFailed, setDetailsFailed] = useState(false);
+	const [diaFeed, setDiaFeed] = useState<DiaFeedInfo>();
+	const [diaFeedFailed, setDiaFeedFailed] = useState(false);
+	const [nowTick, setNowTick] = useState(() => Date.now());
 	const [scrub, setScrub] = useState<{
 		price: number;
 		timestamp: number;
 	} | null>(null);
+
+	useEffect(() => {
+		let active = true;
+		setDiaFeed(undefined);
+		setDiaFeedFailed(false);
+		void fetchDiaFeedInfo(candidate.assetId)
+			.then((info) => {
+				if (!active) return;
+				if (info) setDiaFeed(info);
+				else setDiaFeedFailed(true);
+			})
+			.catch(() => active && setDiaFeedFailed(true));
+		return () => {
+			active = false;
+		};
+	}, [candidate.assetId]);
+
+	useEffect(() => {
+		const timer = window.setInterval(() => setNowTick(Date.now()), 30_000);
+		return () => window.clearInterval(timer);
+	}, []);
 
 	useEffect(() => {
 		if (!infoOpen || details || detailsFailed) return;
@@ -284,16 +309,23 @@ function PriceSparkline({
 	}, [candidate.assetId, details, detailsFailed, infoOpen]);
 
 	useEffect(() => {
+		if (!infoOpen) return;
+		void fetchDiaFeedInfo(candidate.assetId, { refresh: true })
+			.then((info) => info && setDiaFeed(info))
+			.catch(() => undefined);
+	}, [candidate.assetId, infoOpen]);
+
+	useEffect(() => {
 		let active = true;
 		setCoverageHistory(undefined);
 		void api
-			.assetHistory(candidate.assetId, "ALL", retryCount > 0)
+			.assetHistory(candidate.assetId, "1Y", retryCount > 0)
 			.then((result) => active && setCoverageHistory(result))
 			.catch(
 				() =>
 					active &&
 					setCoverageHistory({
-						period: "ALL",
+						period: "1Y",
 						source: "unavailable",
 						points: [],
 					}),
@@ -339,7 +371,12 @@ function PriceSparkline({
 	const priceTicks = useMemo(() => chartPriceTicks(prices), [prices]);
 	const first = prices[0];
 	const last = prices.at(-1);
-	const displayPrice = scrub?.price ?? last ?? candidate.marketPriceUsd ?? 0;
+	const displayPrice =
+		scrub?.price ??
+		diaFeed?.price ??
+		last ??
+		candidate.marketPriceUsd ??
+		0;
 	const change = first && last ? ((last - first) / first) * 100 : 0;
 	const dateLabels = chartDateLabels(history);
 	const coverageSpan = historySpanSeconds(coverageHistory);
@@ -369,14 +406,8 @@ function PriceSparkline({
 					minute: period === "1H" || period === "1D" ? "2-digit" : undefined,
 				}).format(new Date(scrub.timestamp * 1000))
 			: null;
-	const compactCommunityLinks = details
-		? ["X", "Telegram"].flatMap((label) => {
-				const item = details.community.find(
-					(community) => community.label === label && community.url,
-				);
-				return item?.url ? [item] : [];
-			})
-		: [];
+	const feedStale =
+		diaFeed !== undefined && diaFeedAgeSec(diaFeed.timestamp, nowTick) > 6 * 3600;
 
 	useEffect(() => {
 		if (!unavailable || retryCount >= 2) return;
@@ -486,6 +517,39 @@ function PriceSparkline({
 				</>
 			)}
 			<p className="chart-hint">Hold &amp; drag to scrub · DIA live spot</p>
+			{diaFeed ? (
+				<div
+					className={`dia-feed-strip${feedStale ? " is-stale" : ""}`}
+					aria-label="DIA oracle feed"
+				>
+					<span className="dia-feed-badge">DIA</span>
+					<span className="dia-feed-key">{diaFeed.feedKey}</span>
+					<span className="dia-feed-meta">{diaFeed.type}</span>
+					<span className="dia-feed-meta dia-feed-endpoint" title={diaFeed.endpoint}>
+						{diaFeed.endpoint}
+					</span>
+					<span className="dia-feed-price">{formatUsdPrice(diaFeed.price)}</span>
+					<span
+						className="dia-feed-age"
+						title={diaFeed.updatedAtIso}
+					>
+						{formatDiaUpdatedAt(diaFeed.timestamp, nowTick)}
+						<span className="dia-feed-clock">
+							· {formatDiaClock(diaFeed.timestamp)}
+						</span>
+					</span>
+				</div>
+			) : diaFeedFailed ? (
+				<div className="dia-feed-strip is-muted" aria-label="DIA oracle feed">
+					<span className="dia-feed-badge">DIA</span>
+					<span>Oracle feed unavailable</span>
+				</div>
+			) : (
+				<div className="dia-feed-strip is-muted" aria-label="DIA oracle feed">
+					<span className="dia-feed-badge">DIA</span>
+					<span>Loading oracle feed…</span>
+				</div>
+			)}
 			<div className="chart-controls">
 				<fieldset
 					className="chart-timeframes"
@@ -524,61 +588,100 @@ function PriceSparkline({
 			</div>
 			{infoOpen ? (
 				<div className="asset-info-panel" aria-live="polite">
-					{!details && !detailsFailed ? (
-						<p className="asset-info-status">Loading asset details…</p>
-					) : null}
-					{detailsFailed ? (
-						<p className="asset-info-status">Asset details are unavailable.</p>
-					) : null}
-					{details ? (
+					{diaFeed ? (
 						<>
 							<div className="asset-info-tags">
 								<div>
-									{candidate.marketCapRank ? (
-										candidate.coingeckoId ? (
-											<a
-												className="asset-rank-tag is-coingecko"
-												href={`https://www.coingecko.com/en/coins/${encodeURIComponent(candidate.coingeckoId)}`}
-												target="_blank"
-												rel="noopener noreferrer"
-												aria-label={`View ${candidate.name} on CoinGecko`}
-											>
-												<img src="/assets/providers/coingecko.svg" alt="" />
-												Rank #{candidate.marketCapRank}
-												<span aria-hidden="true">↗</span>
-											</a>
-										) : (
-											<span className="asset-rank-tag is-coingecko">
-												<img src="/assets/providers/coingecko.svg" alt="" />
-												Rank #{candidate.marketCapRank}
-											</span>
-										)
-									) : null}
-									{candidate.discoveryProvider === "UNISWAP" &&
-									candidate.providerVolumeRank ? (
-										<span
-											className="asset-rank-tag is-uniswap"
-											title={`Rank ${candidate.providerVolumeRank} of ${candidate.providerVolumeRankTotal ?? 20} pools on the first Uniswap page sorted by 24-hour volume`}
-										>
-											<img src="/assets/providers/uniswap.svg" alt="" />
-											24h rank #{candidate.providerVolumeRank} by volume
-										</span>
-									) : null}
-									{visibleAssetTags(details.categories).map((tag) => (
-										<span
-											className={`asset-tag is-${tag.tone}`}
-											key={tag.source}
-										>
-											{tag.label}
-										</span>
-									))}
-									{!visibleAssetTags(details.categories).length &&
-									!candidate.marketCapRank &&
-									!candidate.providerVolumeRank
-										? "Not listed"
-										: null}
+									<span className="asset-tag is-tokenized">DIA Oracle</span>
+									<span className="asset-tag is-neutral">{diaFeed.type}</span>
+									<span className="asset-tag is-neutral">{diaFeed.feedKey}</span>
+									{feedStale ? (
+										<span className="asset-tag is-stale">Stale feed</span>
+									) : (
+										<span className="asset-tag is-live">Live</span>
+									)}
 								</div>
 							</div>
+							<div className="asset-info-metrics">
+								<dl>
+									<div>
+										<dt>Spot:</dt>
+										<dd>{formatUsdPrice(diaFeed.price)}</dd>
+									</div>
+									<div>
+										<dt>Ticker:</dt>
+										<dd>{diaFeed.ticker}</dd>
+									</div>
+								</dl>
+								<dl>
+									<div>
+										<dt>Updated:</dt>
+										<dd title={diaFeed.updatedAtIso}>
+											{formatDiaUpdatedAt(diaFeed.timestamp, nowTick)}
+										</dd>
+									</div>
+									<div>
+										<dt>Clock:</dt>
+										<dd title={diaFeed.updatedAtIso}>
+											{formatDiaClock(diaFeed.timestamp)}
+										</dd>
+									</div>
+								</dl>
+								<dl>
+									<div>
+										<dt>Name:</dt>
+										<dd>{diaFeed.name}</dd>
+									</div>
+									<div>
+										<dt>Oracle key:</dt>
+										<dd>{diaFeed.feedKey}</dd>
+									</div>
+								</dl>
+								<dl>
+									<div>
+										<dt>Endpoint:</dt>
+										<dd title={diaFeed.restPath}>{diaFeed.endpoint}</dd>
+									</div>
+									<div>
+										<dt>Source:</dt>
+										<dd>DIA RWA REST</dd>
+									</div>
+								</dl>
+							</div>
+							<div className="asset-info-link-row">
+								<strong>Feed:</strong>
+								<div>
+									<a
+										href={`https://api.diadata.org${diaFeed.restPath.replace(/^\/dia-api/, "")}`}
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										Open DIA quote ↗
+									</a>
+									<a
+										href="https://www.diadata.org/docs/reference/apis/rwa-prices"
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										RWA docs ↗
+									</a>
+								</div>
+							</div>
+							<p className="asset-info-reason">
+								Live spot from DIA&apos;s RWA API ({diaFeed.endpoint}). Chart
+								path is market history anchored to this oracle price for vault
+								key {diaFeed.feedKey}.
+							</p>
+							<p className="asset-info-reason">{reason}</p>
+						</>
+					) : !diaFeedFailed ? (
+						<p className="asset-info-status">Loading DIA oracle feed…</p>
+					) : detailsFailed ? (
+						<p className="asset-info-status">Asset details are unavailable.</p>
+					) : !details ? (
+						<p className="asset-info-status">Loading asset details…</p>
+					) : (
+						<>
 							<div className="asset-info-metrics">
 								<dl>
 									<div>
@@ -594,57 +697,18 @@ function PriceSparkline({
 										<dd>
 											{(candidate.volume24hUsd ?? details.volume24hUsd)
 												? compactUsdFormatter.format(
-														candidate.volume24hUsd ?? details.volume24hUsd ?? 0,
+														candidate.volume24hUsd ??
+															details.volume24hUsd ??
+															0,
 													)
 												: "—"}
 										</dd>
 									</div>
 								</dl>
-								<dl>
-									<div>
-										<dt>Liquidity:</dt>
-										<dd>
-											{candidate.liquidityUsd !== undefined
-												? compactUsdFormatter.format(candidate.liquidityUsd)
-												: "—"}
-										</dd>
-									</div>
-									<div>
-										<dt>Token Holders:</dt>
-										<dd>{formatCount(details.holderCount) ?? "—"}</dd>
-									</div>
-								</dl>
-							</div>
-							<div className="asset-info-link-row">
-								<strong>Links:</strong>
-								<div>
-									{details.websiteUrl ? (
-										<a
-											href={details.websiteUrl}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											Website ↗
-										</a>
-									) : null}
-									{compactCommunityLinks.map((item) => (
-										<a
-											href={item.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											key={item.label}
-										>
-											{item.label} ↗
-										</a>
-									))}
-									{!details.websiteUrl && !compactCommunityLinks.length ? (
-										<span>Not listed</span>
-									) : null}
-								</div>
 							</div>
 							<p className="asset-info-reason">{reason}</p>
 						</>
-					) : null}
+					)}
 				</div>
 			) : null}
 			{isNewToken ? (
@@ -743,7 +807,9 @@ export function SwipeCard({
 				</div>
 				<div className="allocation-stamp">
 					<strong>{ticketSizeUsd}</strong>
-					<span>{stableToken}</span>
+					<span>
+						<StableTokenLabel token={stableToken} />
+					</span>
 				</div>
 			</div>
 			<PriceSparkline

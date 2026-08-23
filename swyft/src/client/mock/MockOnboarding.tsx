@@ -8,7 +8,6 @@ import {
 } from "../../domain/schemas";
 import type { PublicConfig } from "../api";
 import { ArrowRight, Check, Shield } from "../components/Icons";
-import { shortStellarAddress } from "../stellar/kit";
 
 type Step =
 	| "welcome"
@@ -79,37 +78,21 @@ export function MockOnboarding({
 					bounds, and nothing moves until you approve it with your Stellar
 					wallet.
 				</p>
-				<div className="onboarding-connect-control">
-					<fieldset className="onboarding-chain-selector">
-						<legend className="sr-only">Network</legend>
-						<button type="button" className="active" aria-pressed="true">
-							<img
-								className="chain-mark chain-mark-stellar"
-								src="/assets/chains/stellar.svg"
-								width={20}
-								height={20}
-								alt=""
-								aria-hidden="true"
-							/>
-							<span>Stellar</span>
+				{stellarAddress ? null : (
+					<div className="onboarding-connect-control">
+						<button
+							type="button"
+							className="button button-primary onboarding-connect-button"
+							onClick={onConnectWallet}
+							disabled={stellarConnecting}
+							aria-label="Connect Stellar wallet"
+							title="Connect Stellar wallet"
+						>
+							<Wallet size={18} strokeWidth={1.8} />
+							{stellarConnecting ? "Connecting…" : "Connect Stellar wallet"}
 						</button>
-					</fieldset>
-					<button
-						type="button"
-						className="button button-primary onboarding-connect-button"
-						onClick={onConnectWallet}
-						disabled={stellarConnecting}
-						aria-label="Connect Stellar wallet"
-						title="Connect Stellar wallet"
-					>
-						<Wallet size={18} strokeWidth={1.8} />
-						{stellarConnecting
-							? "Connecting…"
-							: stellarAddress
-								? shortStellarAddress(stellarAddress)
-								: "Connect Stellar wallet"}
-					</button>
-				</div>
+					</div>
+				)}
 				{stellarError ? (
 					<div className="error-message" role="alert">
 						{stellarError}
@@ -143,13 +126,18 @@ export function MockOnboarding({
 
 			<section className="onboarding-action">
 				{step === "welcome" ? (
-					<>
+					<div className="onboarding-plan-card">
 						<span className="onboarding-kicker">New here?</span>
 						<h2>Build your Swyft plan</h2>
 						<p>
 							Answer five questions, then explore Basket, Portfolio, Activity,
 							and Account on Stellar.
 						</p>
+						<ul className="onboarding-plan-steps">
+							<li>Cadence &amp; period limit</li>
+							<li>Ticket size &amp; risk</li>
+							<li>Asset mix</li>
+						</ul>
 						<button
 							type="button"
 							className="button button-primary"
@@ -159,10 +147,10 @@ export function MockOnboarding({
 						</button>
 						<small>
 							{stellarAddress
-								? `Connected ${shortStellarAddress(stellarAddress)}`
+								? "Wallet connected — you can start now."
 								: "Connect a Stellar wallet anytime before you save."}
 						</small>
-					</>
+					</div>
 				) : null}
 
 				{step === "cadence" ? (

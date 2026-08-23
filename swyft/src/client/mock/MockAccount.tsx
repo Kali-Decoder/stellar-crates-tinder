@@ -1,4 +1,5 @@
 import type { OnboardingPreferences } from "../../domain/schemas";
+import { StableTokenLabel } from "../components/StableTokenLabel";
 import { shortStellarAddress } from "../stellar/kit";
 
 export function MockAccount({
@@ -26,7 +27,10 @@ export function MockAccount({
 						Stellar wallet
 					</span>
 					<strong>{shortStellarAddress(wallet)}</strong>
-					<p>USDC on Stellar · you approve every basket.</p>
+					<p>
+						<StableTokenLabel token="USDC" /> on Stellar · you approve every
+						basket.
+					</p>
 				</div>
 			</section>
 
@@ -47,7 +51,9 @@ export function MockAccount({
 					</div>
 					<div>
 						<dt>Ticket size</dt>
-						<dd>${preferences.ticketSizeUsd} USDC</dd>
+						<dd>
+							${preferences.ticketSizeUsd} <StableTokenLabel token="USDC" />
+						</dd>
 					</div>
 					<div>
 						<dt>Risk</dt>

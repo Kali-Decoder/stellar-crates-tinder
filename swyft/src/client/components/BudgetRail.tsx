@@ -7,6 +7,7 @@ import { formatTicketSizeUsd } from "../../domain/schemas";
 import { formatUsdPrice } from "../price-format";
 import { AssetMark } from "./AssetMark";
 import { Close } from "./Icons";
+import { StableTokenLabel } from "./StableTokenLabel";
 
 function spotPriceUsd(candidate: Candidate): number | undefined {
 	const price = candidate.marketPriceUsd;
@@ -44,7 +45,8 @@ export function BudgetSummary({
 			<div className="rail-budget-copy">
 				<span className="rail-budget-label">This period</span>
 				<span className="rail-budget-value">
-					<strong>{formatTicketSizeUsd(remaining)}</strong> {token} left
+					<strong>{formatTicketSizeUsd(remaining)}</strong>{" "}
+					<StableTokenLabel token={token} /> left
 				</span>
 			</div>
 			<span
@@ -121,7 +123,8 @@ export function BudgetRail({
 					<span className="basket-fab-label">
 						{selected.length ? (
 							<>
-								Basket · <strong>{total}</strong> {token}
+								Basket · <strong>{total}</strong>{" "}
+								<StableTokenLabel token={token} />
 							</>
 						) : (
 							"Basket empty"
@@ -222,7 +225,9 @@ export function BudgetRail({
 											</small>
 											<span className="basket-amount">
 												<strong>{formatTicketSizeUsd(ticketSizeUsd)}</strong>
-												<small>{token}</small>
+												<small>
+													<StableTokenLabel token={token} />
+												</small>
 											</span>
 										</div>
 									</div>
@@ -246,7 +251,8 @@ export function BudgetRail({
 								onReview();
 							}}
 						>
-							Review basket ({selected.length}) · {total} {token}
+							Review basket ({selected.length}) · {total}{" "}
+							<StableTokenLabel token={token} />
 						</button>
 					) : null}
 				</div>

@@ -14,6 +14,7 @@ import type { ExecutionRecord, FeedResponse } from "../api";
 import { AssetMark } from "./AssetMark";
 import { Confetti } from "./magicui/confetti";
 import { Check, Shield } from "./Icons";
+import { StableTokenLabel } from "./StableTokenLabel";
 
 export function ReceiptScreen({
 	record,
@@ -159,9 +160,14 @@ export function ReceiptScreen({
 							<div className="receipt-asset">
 								<b>{candidate.symbol}</b>
 								<small>
-									{quote
-										? `${formatUsd(formatUnits(BigInt(quote.amountInBaseUnits), 6))} allocation`
-										: `Allocation unavailable · ${stableToken}`}
+									{quote ? (
+										`${formatUsd(formatUnits(BigInt(quote.amountInBaseUnits), 6))} allocation`
+									) : (
+										<>
+											Allocation unavailable ·{" "}
+											<StableTokenLabel token={stableToken} />
+										</>
+									)}
 								</small>
 							</div>
 							<div

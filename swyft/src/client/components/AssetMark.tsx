@@ -23,6 +23,16 @@ export function AssetIconProvider({ children }: { children: ReactNode }) {
 }
 
 function AssetLogo({ iconUrl, domain, symbol }: { iconUrl?: string; domain?: string; symbol: string }) {
+  const upper = symbol.toUpperCase();
+  if (upper === "USDC") {
+    return (
+      <img
+        src="/assets/tokens/usdc.png"
+        alt="USDC logo"
+      />
+    );
+  }
+
   type LogoSource = "provided" | "logoDev" | "allinvest" | "letter";
   const fallbackSource: LogoSource = symbol === "WETH" ? "letter" : "logoDev";
   const initialSource: LogoSource = iconUrl ? "provided" : fallbackSource;
@@ -33,7 +43,7 @@ function AssetLogo({ iconUrl, domain, symbol }: { iconUrl?: string; domain?: str
   const imageUrl = source === "provided"
     ? iconUrl
     : source === "logoDev"
-    ? `https://img.logo.dev/ticker/${encodeURIComponent(symbol.toUpperCase())}?token=${LOGO_DEV_PUBLISHABLE_KEY}&size=128&format=png&theme=light&retina=true&fallback=404`
+    ? `https://img.logo.dev/ticker/${encodeURIComponent(upper)}?token=${LOGO_DEV_PUBLISHABLE_KEY}&size=128&format=png&theme=light&retina=true&fallback=404`
       : source === "allinvest" && domain
         ? `${TICKER_LOGO_CDN}/${domain}`
         : undefined;

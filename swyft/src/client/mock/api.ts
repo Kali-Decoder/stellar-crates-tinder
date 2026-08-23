@@ -26,6 +26,7 @@ import {
 	buildMockHistory,
 	buildMockIcons,
 	buildPreparedExecution,
+	buildPreparedExecutionFromCandidates,
 	MOCK_CONFIG,
 	mockRobinhoodPortfolio,
 	mockSolanaBalance,
@@ -110,21 +111,49 @@ interface MockState {
 	feeds: Map<string, FeedResponse>;
 	executions: Map<string, ExecutionRecord>;
 	lastCandidates: CandidateLite[];
+	candidatesById: Map<string, CandidateLite>;
 }
 
 type CandidateLite = FeedResponse["candidates"][number];
 
-const state: MockState = {
-	sessions: new Map(),
-	feeds: new Map(),
-	executions: new Map(),
-	lastCandidates: [],
-};
+const MOCK_STATE_KEY = "__swyftMockApiState__";
 
-function requireSession(sessionId: string) {
-	const session = state.sessions.get(sessionId);
-	if (!session) throw new Error("SESSION_NOT_FOUND");
-	return session;
+/** Survive Vite HMR so review still finds the open session React holds. */
+function getState(): MockState {
+	const globalStore = globalThis as typeof globalThis & {
+		[MOCK_STATE_KEY]?: MockState;
+	};
+	if (!globalStore[MOCK_STATE_KEY]) {
+		globalStore[MOCK_STATE_KEY] = {
+			sessions: new Map(),
+			feeds: new Map(),
+			executions: new Map(),
+			lastCandidates: [],
+			candidatesById: new Map(),
+		};
+	} else if (!globalStore[MOCK_STATE_KEY].candidatesById) {
+		globalStore[MOCK_STATE_KEY].candidatesById = new Map();
+	}
+	return globalStore[MOCK_STATE_KEY];
+}
+
+/** Rebuild a missing session under the same id (HMR / remount). */
+function ensureSession(sessionId: string): WeeklySession {
+	const state = getState();
+	const existing = state.sessions.get(sessionId);
+	if (existing) return existing;
+	const preferences = state.preferences;
+	const revived: WeeklySession = {
+		id: sessionId,
+		epochId: `mock:revived:${Date.now()}`,
+		chain: preferences?.activeChain ?? "ROBINHOOD",
+		wallet: MOCK_WALLET,
+		executionProvider: preferences?.executionProvider ?? "ZERO_EX",
+		feedRankingProvider: preferences?.feedRankingProvider ?? "DETERMINISTIC",
+		status: "OPEN",
+	};
+	state.sessions.set(sessionId, revived);
+	return revived;
 }
 
 export function createMockApi(): MockApi {
@@ -135,12 +164,13 @@ export function createMockApi(): MockApi {
 		},
 		async preferences() {
 			await delay(60);
+			const state = getState();
 			if (!state.preferences) throw new Error("PREFERENCES_NOT_FOUND");
 			return state.preferences;
 		},
 		async savePreferences(preferences) {
 			await delay(60);
-			state.preferences = preferences;
+			getState().preferences = preferences;
 			return preferences;
 		},
 		async assetIcons() {
@@ -168,11 +198,11 @@ export function createMockApi(): MockApi {
 		},
 		async solanaPortfolio() {
 			await delay(80);
-			return mockSolanaPortfolio(state.lastCandidates);
+			return mockSolanaPortfolio(getState().lastCandidates);
 		},
 		async robinhoodPortfolio() {
 			await delay(80);
-			return mockRobinhoodPortfolio(state.lastCandidates);
+			return mockRobinhoodPortfolio(getState().lastCandidates);
 		},
 		async openSession(
 			cadence,
@@ -190,18 +220,22 @@ export function createMockApi(): MockApi {
 				feedRankingProvider,
 				status: "OPEN",
 			};
-			state.sessions.set(session.id, session);
+			getState().sessions.set(session.id, session);
 			return session;
 		},
 		async generateFeed(sessionId, preferences, excludedAssetIds = []) {
 			await delay(450);
-			const session = requireSession(sessionId);
+			const state = getState();
+			const session = ensureSession(sessionId);
 			state.preferences = preferences;
 			const feed = buildMockFeed(session, preferences, excludedAssetIds);
 			const candidates = await enrichCandidatesWithDiaPrices(feed.candidates);
 			const enriched = { ...feed, candidates };
 			state.feeds.set(sessionId, enriched);
 			state.lastCandidates = enriched.candidates;
+			for (const candidate of enriched.candidates) {
+				state.candidatesById.set(candidate.assetId, candidate);
+			}
 			return enriched;
 		},
 		async prepareExecution(
@@ -211,8 +245,9 @@ export function createMockApi(): MockApi {
 			periodLimitUsd,
 			_chain = "ROBINHOOD",
 		) {
-			await delay(500);
-			const session = requireSession(sessionId);
+			await delay(180);
+			const state = getState();
+			const session = ensureSession(sessionId);
 			const preferences: OnboardingPreferences = state.preferences ?? {
 				executionProvider: session.executionProvider,
 				activeChain: session.chain,
@@ -224,17 +259,35 @@ export function createMockApi(): MockApi {
 				assetClasses: ["CRYPTO", "STOCK_TOKEN"],
 				riskDisclosureAccepted: true,
 			};
-			const prepared = buildPreparedExecution(
-				session,
-				{ ...preferences, ticketSizeUsd, periodLimitUsd },
-				assetIds,
-				periodLimitUsd,
-			);
+
+			const fromFeed = assetIds
+				.map((id) => state.candidatesById.get(id))
+				.filter((c): c is CandidateLite => Boolean(c));
+
+			let prepared: ExecutionRecord;
+			if (fromFeed.length === assetIds.length) {
+				const priced = await enrichCandidatesWithDiaPrices(fromFeed);
+				prepared = buildPreparedExecutionFromCandidates(
+					session,
+					priced,
+					ticketSizeUsd,
+					periodLimitUsd,
+				);
+			} else {
+				prepared = buildPreparedExecution(
+					session,
+					{ ...preferences, ticketSizeUsd, periodLimitUsd },
+					assetIds,
+					periodLimitUsd,
+				);
+			}
+
 			state.executions.set(prepared.plan.executionId, prepared);
 			return prepared;
 		},
 		async demoSettle(executionId) {
 			await delay(600);
+			const state = getState();
 			const current = state.executions.get(executionId);
 			if (!current) throw new Error("EXECUTION_NOT_FOUND");
 			const settled = settleMockExecution(current);
@@ -243,6 +296,7 @@ export function createMockApi(): MockApi {
 		},
 		async markSubmitted(executionId, transactionHashes) {
 			await delay(200);
+			const state = getState();
 			const current = state.executions.get(executionId);
 			if (!current) throw new Error("EXECUTION_NOT_FOUND");
 			const submitted: ExecutionRecord = {
@@ -258,6 +312,7 @@ export function createMockApi(): MockApi {
 		},
 		async reconcile(executionId) {
 			await delay(300);
+			const state = getState();
 			const current = state.executions.get(executionId);
 			if (!current) throw new Error("EXECUTION_NOT_FOUND");
 			if (current.status === "SETTLED") return current;
@@ -267,12 +322,13 @@ export function createMockApi(): MockApi {
 		},
 		async execution(executionId) {
 			await delay(80);
-			const current = state.executions.get(executionId);
+			const current = getState().executions.get(executionId);
 			if (!current) throw new Error("EXECUTION_NOT_FOUND");
 			return current;
 		},
 		async prepareExit(assetId, amountInBaseUnits) {
 			await delay(400);
+			const state = getState();
 			const candidate =
 				state.lastCandidates.find((item) => item.assetId === assetId) ??
 				state.lastCandidates[0];

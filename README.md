@@ -18,3 +18,7 @@ cd server && npm install && npm run dev
 # Or both from swyft/
 cd swyft && npm run dev:stack
 ```
+
+Open http://localhost:5173 — use **Docs** in the header (or nav after sign-in) for the in-app product guide.
+
+Written docs: [`swyft/docs/PRODUCT_GUIDE.md`](swyft/docs/PRODUCT_GUIDE.md).

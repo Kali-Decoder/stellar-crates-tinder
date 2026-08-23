@@ -25,7 +25,7 @@ const WalletMenu = lazy(() =>
 );
 
 interface Props {
-	active: "week" | "positions" | "receipts" | "account";
+	active: "week" | "positions" | "receipts" | "account" | "docs";
 	onNavigate: (target: Props["active"]) => void;
 	wallet?: string;
 	fundingWallet?: ShellFundingWallet;
@@ -114,6 +114,7 @@ export function AppShell({
 							["positions", "Portfolio"],
 							["receipts", "Activity"],
 							["account", "Account"],
+							["docs", "Docs"],
 						].map(([id, label]) => (
 							<button
 								type="button"

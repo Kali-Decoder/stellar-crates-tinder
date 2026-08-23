@@ -98,7 +98,8 @@ export async function recordStellarBasket(input: {
 		input.allocations.map(async (leg) => {
 			let priceAtDepositUsd = 1;
 			try {
-				priceAtDepositUsd = await fetchDiaSpot(leg.symbol);
+				const spot = await fetchDiaSpot(leg.symbol);
+				if (spot?.price && spot.price > 0) priceAtDepositUsd = spot.price;
 			} catch {
 				priceAtDepositUsd = 1;
 			}

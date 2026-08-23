@@ -437,17 +437,70 @@ export function buildPreparedExecution(
 	const selected = assetIds
 		.map((id) => all.find((c) => c.assetId === id))
 		.filter((c): c is Candidate => Boolean(c));
-	const quotes = selected.flatMap((candidate) =>
-		candidate.quote ? [candidate.quote] : [],
+	return buildPreparedExecutionFromCandidates(
+		session,
+		selected,
+		preferences.ticketSizeUsd,
+		periodLimitUsd,
 	);
-	if (quotes.length !== selected.length) {
-		throw new Error("MOCK_QUOTE_MISSING");
+}
+
+/** Prefer the live swipe selection (DIA prices already on candidates). */
+export function buildPreparedExecutionFromCandidates(
+	session: WeeklySession,
+	selected: Candidate[],
+	ticketSizeUsd: number,
+	periodLimitUsd: number,
+): ExecutionRecord {
+	const amountIn = ticketSizeToBaseUnits(ticketSizeUsd).toString();
+	const now = Date.now();
+	const expiresAt = new Date(now + 120_000).toISOString();
+	const quotedAt = new Date(now).toISOString();
+
+	const quotes = selected.map((candidate) => {
+		const price =
+			candidate.marketPriceUsd && candidate.marketPriceUsd > 0
+				? candidate.marketPriceUsd
+				: Number(candidate.quote?.unitPriceUsd ?? 1);
+		const baseOut = candidate.quote?.estimatedAmountOut;
+		const estimated =
+			baseOut ??
+			String(
+				Math.max(
+					1,
+					Math.round((Number(amountIn) / Math.max(price, 0.0001)) * 1e6),
+				),
+			);
+		const minimum =
+			candidate.quote?.minimumAmountOut ??
+			((BigInt(estimated) * 995n) / 1000n).toString();
+		return {
+			requestId: `mock-quote-${candidate.symbol}-${now}`,
+			provider: session.executionProvider,
+			chain: "ROBINHOOD" as const,
+			assetId: candidate.assetId,
+			tokenOut: candidate.contract ?? candidate.assetId,
+			amountInBaseUnits: amountIn,
+			estimatedAmountOut: estimated,
+			minimumAmountOut: minimum,
+			unitPriceUsd: String(price),
+			priceImpactBps: candidate.quote?.priceImpactBps ?? 25,
+			routing:
+				session.executionProvider === "ZERO_EX"
+					? ("ZERO_EX" as const)
+					: ("CLASSIC" as const),
+			quotedAt,
+			expiresAt,
+		};
+	});
+	if (!quotes.length) {
+		throw new Error("Choose at least one asset before refreshing quotes.");
 	}
 	const totalIn = quotes
 		.reduce((sum, quote) => sum + BigInt(quote.amountInBaseUnits), 0n)
 		.toString();
 	const planHash = commitment(
-		`${session.id}:${assetIds.join(",")}:${preferences.ticketSizeUsd}`,
+		`${session.id}:${selected.map((c) => c.assetId).join(",")}:${ticketSizeUsd}`,
 	);
 	const executionId = crypto.randomUUID();
 	const walletCalls = [

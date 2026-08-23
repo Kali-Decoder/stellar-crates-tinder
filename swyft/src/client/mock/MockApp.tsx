@@ -27,6 +27,7 @@ import { AssetIconProvider } from "../components/AssetMark";
 import { BudgetRail } from "../components/BudgetRail";
 import { Confetti } from "../components/magicui/confetti";
 import { ReceiptScreen } from "../components/ReceiptScreen";
+import { DocsScreen } from "../components/DocsScreen";
 import { SwipeCard } from "../components/SwipeCard";
 import { createMockApi } from "./api";
 import { MOCK_CONFIG } from "./data";
@@ -39,8 +40,8 @@ import { useStellarWallet } from "../stellar/useStellarWallet";
 
 installApiOverride(createMockApi() as typeof api);
 
-type View = "week" | "positions" | "receipts" | "account";
-type Stage = "landing" | "loading" | "onboarding" | "swipe" | "review";
+type View = "week" | "positions" | "receipts" | "account" | "docs";
+type Stage = "landing" | "docs" | "loading" | "onboarding" | "swipe" | "review";
 type DecisionFeedback = "invest" | "skip";
 
 export function MockApp() {
@@ -48,6 +49,7 @@ export function MockApp() {
 	const [config] = useState<PublicConfig>(MOCK_CONFIG);
 	const [view, setView] = useState<View>("week");
 	const [stage, setStage] = useState<Stage>("landing");
+	const [docsReturnStage, setDocsReturnStage] = useState<Stage>("landing");
 	const [onboardingChain, setOnboardingChain] =
 		useState<AppChain>("ROBINHOOD");
 	const [session, setSession] = useState<WeeklySession>();
@@ -265,6 +267,28 @@ export function MockApp() {
 		if (target === "week" && stage === "loading" && feed) setStage("swipe");
 	}
 
+	function openDocs(from: Stage = stage) {
+		setDocsReturnStage(from === "docs" ? "landing" : from);
+		window.scrollTo({ top: 0, behavior: "auto" });
+		if (from === "landing" || from === "onboarding") {
+			setStage("docs");
+			return;
+		}
+		setView("docs");
+	}
+
+	function closeDocs() {
+		window.scrollTo({ top: 0, behavior: "auto" });
+		if (docsReturnStage === "landing" || docsReturnStage === "onboarding") {
+			setStage(docsReturnStage);
+			return;
+		}
+		setView("week");
+		if (docsReturnStage === "swipe" || docsReturnStage === "review") {
+			setStage(docsReturnStage);
+		}
+	}
+
 	async function handleConnectWallet() {
 		try {
 			await stellar.connect();
@@ -286,10 +310,19 @@ export function MockApp() {
 		}
 	}
 
+	if (stage === "docs") {
+		return (
+			<div className="docs-standalone">
+				<DocsScreen onBack={closeDocs} />
+			</div>
+		);
+	}
+
 	if (stage === "landing") {
 		return (
 			<MockLanding
 				onSignIn={() => void enterFromLanding()}
+				onOpenDocs={() => openDocs("landing")}
 				signingIn={stellar.isConnecting}
 				signedIn={Boolean(stellar.address)}
 			/>
@@ -355,6 +388,8 @@ export function MockApp() {
 						)}
 						wallet={wallet ?? ""}
 					/>
+				) : view === "docs" ? (
+					<DocsScreen onBack={() => navigate("week")} />
 				) : view === "account" && preferences ? (
 					<MockAccount
 						wallet={wallet ?? ""}
@@ -386,10 +421,7 @@ export function MockApp() {
 							setReceiptCandidates(selected);
 							setView("receipts");
 						}}
-						onExecutionChange={(record) => {
-							setSettlement(record);
-							setReceiptCandidates(selected);
-						}}
+						onExecutionChange={setSettlement}
 						ticketSizeUsd={ticketSizeUsd}
 						periodLimitUsd={periodLimitUsd}
 						wallet={wallet ?? ""}
