@@ -6,8 +6,6 @@
   "trustline": true,
   "mintedUsdc": true,
   "shareWasmHash": "4217581895c609e8be2e4789967f7938650763d5b8a0c9f4481fb67bad1ab0ef",
-  "vault": "CBM4MCM4UCKCVMJ5UBT3INU5VF76UKSIDEUC3G4H6K46XFWTPCQBQPO4",
-  "initialized": true,
   "tokens": {
     "NG": "CB52CF4JTZHNV2A76R3Y3MAJYPUQCEPALCJWNBT2OUXTHJO2FI3T2QHR",
     "WTI": "CAP45F3NIX76KCABVZWM3OTTMISZIYVVETEVCPQTGXGBDWH2HS2V5S5R",
@@ -43,16 +41,16 @@
   "prices": {
     "NG": 2.77247,
     "WTI": 86.36813,
-    "XAGG": 2.21846,
-    "XAU": 4608.17684,
+    "XAGG": 2.21848,
+    "XAU": 4608.1617,
     "IBIT": 43.68,
     "IVV": 769.31,
     "QQQ": 713.44,
     "SPY": 765.71997,
     "TLT": 82.050003,
     "VOO": 703.71002,
-    "EUR": 1.1686748395993782,
-    "JPY": 0.006290436498420974,
+    "EUR": 1.1675423234092235,
+    "JPY": 0.006289705732972431,
     "AAPL": 309.42001,
     "AMD": 472.75,
     "AMZN": 258.64999,
@@ -115,8 +113,6 @@
     "SPY": true,
     "TLT": true,
     "VOO": true,
-    "EUR": true,
-    "JPY": true,
     "AAPL": true,
     "AMD": true,
     "AMZN": true,
@@ -135,5 +131,11 @@
     "V": true,
     "WMT": true,
     "XOM": true
+  },
+  "vault": "CDNUYNSIEOOJ7IYICJLHPQKLLKAYC62B2XR5C644GLUX3P22D6ZVKVO5",
+  "initialized": true,
+  "buckets": {
+    "mag7": 0,
+    "hardAssets": 1
   }
 }

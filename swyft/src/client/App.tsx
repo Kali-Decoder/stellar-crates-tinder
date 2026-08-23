@@ -718,7 +718,7 @@ export function App({ config }: { config: PublicConfig }) {
 						<section className="swipe-workspace">
 							<header className="page-heading">
 								<h1>Build your basket</h1>
-								<p>Swipe right to add left to skip.</p>
+								<p>Swipe left to skip, right to add.</p>
 							</header>
 							{error ? (
 								<div className="fatal-state">
@@ -801,14 +801,6 @@ export function App({ config }: { config: PublicConfig }) {
 									>
 										<button
 											type="button"
-											className="button button-skip"
-											onClick={() => animateDecision(false)}
-											disabled={Boolean(decisionFeedback)}
-										>
-											Skip
-										</button>
-										<button
-											type="button"
 											className="button button-outline"
 											onClick={() => {
 												scrollToTop();
@@ -817,14 +809,6 @@ export function App({ config }: { config: PublicConfig }) {
 											disabled={!selected.length}
 										>
 											Review basket ({selected.length}) <ShoppingBasket />
-										</button>
-										<button
-											type="button"
-											className="button button-primary"
-											onClick={() => animateDecision(true)}
-											disabled={Boolean(decisionFeedback) || !canAddCurrent}
-										>
-											Add {ticketSizeUsd} {stableToken}
 										</button>
 									</div>
 								</>

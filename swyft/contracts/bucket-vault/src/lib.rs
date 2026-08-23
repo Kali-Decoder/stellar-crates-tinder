@@ -174,19 +174,23 @@ impl BucketVault {
             panic_with_error!(e, VaultError::BadAllocation);
         }
 
-        let id = e.storage().instance().get::<_, u32>(&DataKey::NextBucketId).unwrap_or(0);
-        e.storage().instance().set(&DataKey::NextBucketId, &(id + 1));
+		let id = e.storage().instance().get::<_, u32>(&DataKey::NextBucketId).unwrap_or(0);
+		e.storage().instance().set(&DataKey::NextBucketId, &(id + 1));
 
-        // Fixed symbol; name carries the identity.
-        let symbol = String::from_str(e, "SWYFT");
-        let salt: BytesN<32> = e.prng().gen();
-        let share_token = e
-            .deployer()
-            .with_current_contract(salt)
-            .deploy_v2(
-                cfg.share_token_wasm,
-                (e.current_contract_address(), name.clone(), symbol),
-            );
+		// Fixed symbol; name carries the identity.
+		let symbol = String::from_str(e, "SWYFT");
+		// Deterministic salt from bucket id — PRNG salts differ between simulation
+		// and execution, so deploy address leaves the footprint and create_bucket traps.
+		let mut salt_bytes = [0u8; 32];
+		salt_bytes[28..32].copy_from_slice(&id.to_be_bytes());
+		let salt = BytesN::from_array(e, &salt_bytes);
+		let share_token = e
+			.deployer()
+			.with_current_contract(salt)
+			.deploy_v2(
+				cfg.share_token_wasm,
+				(e.current_contract_address(), name.clone(), symbol),
+			);
 
         let bucket = Bucket { id, name, allocations, share_token };
         e.storage().persistent().set(&DataKey::Bucket(id), &bucket);

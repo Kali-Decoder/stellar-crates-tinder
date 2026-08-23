@@ -1,4 +1,4 @@
-import { CircleHelp, Heart, X } from "lucide-react";
+import { CircleHelp } from "lucide-react";
 import {
 	useEffect,
 	useId,
@@ -40,6 +40,8 @@ import {
 import { AssetMark } from "./AssetMark";
 import { StableTokenLabel } from "./StableTokenLabel";
 import { unlockSwipeAudio } from "../swipe-sounds";
+import { analyzePriceSeries } from "../analyze-signal";
+import { AnalyzePanel } from "./AnalyzePanel";
 
 const SWIPE_THRESHOLD_PX = 72;
 const LOADING_DOTS = Array.from({ length: 32 }, (_, index) => index);
@@ -398,6 +400,7 @@ function PriceSparkline({
 	const loading = history === undefined;
 	const unavailable = history?.source === "unavailable";
 	const isDown = change < 0;
+	const analyze = useMemo(() => analyzePriceSeries(prices), [prices]);
 	const scrubDate =
 		scrub !== null
 			? new Intl.DateTimeFormat("en-US", {
@@ -720,6 +723,20 @@ function PriceSparkline({
 					) : null}
 				</div>
 			) : null}
+			{analyze ? (
+				<AnalyzePanel
+					analyze={analyze}
+					periodLabel={periodLabel}
+					symbol={candidate.symbol}
+				/>
+			) : !loading && !unavailable ? (
+				<div className="card-analyze is-muted">
+					<span className="card-analyze-eyebrow">Analyze</span>
+					<p className="card-analyze-detail">
+						Need more price history for a signal.
+					</p>
+				</div>
+			) : null}
 		</div>
 	);
 }
@@ -802,29 +819,6 @@ export function SwipeCard({
 				</div>
 			) : null}
 
-			<div className="card-hover-actions" aria-hidden={busy}>
-				<button
-					type="button"
-					className="card-hover-reject"
-					onClick={() => onSwipe(false)}
-					disabled={busy}
-					aria-label="Skip asset"
-				>
-					<X size={18} strokeWidth={2.6} aria-hidden="true" />
-					Skip
-				</button>
-				<button
-					type="button"
-					className="card-hover-accept"
-					onClick={() => onSwipe(true)}
-					disabled={busy || !canAdd}
-					aria-label="Add asset"
-				>
-					<Heart size={16} strokeWidth={2.4} fill="currentColor" aria-hidden="true" />
-					Add
-				</button>
-			</div>
-
 			<div
 				className={`card-stamp card-stamp-nope${dragX < -24 ? " is-visible" : ""}`}
 				aria-hidden="true"
@@ -837,6 +831,12 @@ export function SwipeCard({
 			>
 				Add
 			</div>
+
+			<p className="card-swipe-hint" aria-hidden={busy}>
+				<span>← Skip</span>
+				<span>Swipe</span>
+				<span>Add →</span>
+			</p>
 
 			<div className="card-head">
 				<div className="asset-title">

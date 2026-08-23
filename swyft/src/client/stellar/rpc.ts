@@ -110,11 +110,13 @@ function formatTxFailure(tx: Awaited<ReturnType<typeof waitForTx>>): string {
 		"diagnosticEventsXdr" in tx && Array.isArray(tx.diagnosticEventsXdr)
 			? tx.diagnosticEventsXdr
 			: [];
+	const hints: string[] = [];
 	for (const raw of events) {
 		try {
 			const diagnostic = xdr.DiagnosticEvent.fromXDR(raw, "base64");
 			if (diagnostic.inSuccessfulContractCall()) continue;
-			const topics = diagnostic.event().body().value().topics();
+			const body = diagnostic.event().body().value();
+			const topics = body.topics();
 			const labels = topics.map((topic) => {
 				const kind = topic.switch().name;
 				if (kind === "scvSymbol") return topic.sym().toString();
@@ -125,14 +127,48 @@ function formatTxFailure(tx: Awaited<ReturnType<typeof waitForTx>>): string {
 				}
 				return kind;
 			});
-			if (labels.includes("error") || labels.includes("host_fn_failed")) {
-				return labels.join(" ");
+			const data = body.data();
+			const dataHint = scValHint(data);
+			if (
+				labels.includes("error") ||
+				labels.includes("host_fn_failed") ||
+				labels.includes("fn_call")
+			) {
+				hints.push([labels.join("."), dataHint].filter(Boolean).join(": "));
+			} else if (dataHint.includes("footprint") || dataHint.includes("trap")) {
+				hints.push(dataHint);
 			}
 		} catch {
 			/* ignore malformed diagnostics */
 		}
 	}
-	return "";
+	const unique = [...new Set(hints.filter(Boolean))];
+	return unique.slice(0, 3).join(" | ");
+}
+
+function scValHint(val: xdr.ScVal): string {
+	try {
+		const kind = val.switch().name;
+		if (kind === "scvString") return val.str().toString();
+		if (kind === "scvSymbol") return val.sym().toString();
+		if (kind === "scvVec") {
+			return (val.vec() ?? [])
+				.map((entry) => scValHint(entry))
+				.filter(Boolean)
+				.join(" ");
+		}
+		if (kind === "scvMap") {
+			return (val.map() ?? [])
+				.map((entry) => scValHint(entry.val()))
+				.filter(Boolean)
+				.join(" ");
+		}
+		const native = scValToNative(val);
+		if (typeof native === "string") return native;
+		return "";
+	} catch {
+		return "";
+	}
 }
 
 export function addressScVal(id: string) {

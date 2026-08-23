@@ -4,6 +4,7 @@
 //
 //   node scripts/deploy-stellar.mjs                  # full bring-up (all catalog assets)
 //   node scripts/deploy-stellar.mjs --assets AAPL,NVDA,SPY,XAU   # subset of pools
+//   node scripts/deploy-stellar.mjs --redeploy-vault  # new vault wasm + re-seed pools
 //   node scripts/deploy-stellar.mjs --skip-prices    # skip the price-updater cycle
 //
 // What it does:
@@ -182,6 +183,15 @@ if (!STATE.trustline) {
 if (!STATE.mintedUsdc) {
 	invoke(STATE.usdc, "demo-usdc-issuer", "mint", [["to", STATE.admin], ["amount", USDC_MINT]]);
 	STATE.mintedUsdc = true;
+	save();
+}
+
+if (process.argv.includes("--redeploy-vault")) {
+	console.log("\n== redeploy vault (clear vault + pool seed markers)");
+	delete STATE.vault;
+	delete STATE.initialized;
+	delete STATE.buckets;
+	STATE.seeded = {};
 	save();
 }
 
@@ -408,6 +418,21 @@ console.log(JSON.stringify({
 	admin: STATE.admin,
 	buckets: STATE.buckets,
 }, null, 2));
+
+// Keep UI deploy.json in sync with script state.
+const uiDeployPath = fileURLToPath(new URL("../src/client/stellar/deploy.json", import.meta.url));
+const uiDeploy = {
+	admin: STATE.admin,
+	usdcIssuer: STATE.usdcIssuer,
+	oracle: STATE.oracle,
+	usdc: STATE.usdc,
+	vault: STATE.vault,
+	shareWasmHash: STATE.shareWasmHash,
+	tokens: STATE.tokens,
+	prices: STATE.prices,
+};
+writeFileSync(uiDeployPath, `${JSON.stringify(uiDeploy, null, 2)}\n`);
+console.log(`synced ${uiDeployPath}`);
 
 function usdLabel(p) {
 	return `$${p >= 1000 ? Math.round(p).toLocaleString() : p.toFixed(2)}`;

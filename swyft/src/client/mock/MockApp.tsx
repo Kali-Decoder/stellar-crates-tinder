@@ -530,9 +530,7 @@ function MockAppRoutes() {
 							<header className="page-heading">
 								<h1>Build your basket</h1>
 								<p>
-									Drag the card, hover to Reject / Add, or use{" "}
-									<kbd className="inline-key">←</kbd>{" "}
-									<kbd className="inline-key">→</kbd>.
+									Swipe left to skip, right to add. No buttons — drag the card.
 								</p>
 							</header>
 							{error ? (
