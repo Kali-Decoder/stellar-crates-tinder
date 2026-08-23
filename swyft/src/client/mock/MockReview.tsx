@@ -165,7 +165,7 @@ export function MockReview({
 			const balance = await readUsdcBalance(wallet);
 			if (balance < needed) {
 				throw new Error(
-					`Need ${total.toFixed(2)} DEMOUSD on testnet (wallet has ${(Number(balance) / 10 ** USDC_DECIMALS).toFixed(2)}). Use Get testnet DEMOUSD on Profile, or the button below.`,
+					`Need ${total.toFixed(2)} USDC on testnet (wallet has ${(Number(balance) / 10 ** USDC_DECIMALS).toFixed(2)}). Use Get testnet USDC on Profile, or the button below.`,
 				);
 			}
 
@@ -237,7 +237,7 @@ export function MockReview({
 			});
 			const balance = await readUsdcBalance(wallet);
 			setWalletBalance(Number(balance) / 10 ** USDC_DECIMALS);
-			setStatusLine("DEMOUSD minted — try Invest on Stellar again.");
+			setStatusLine("USDC minted — try Invest on Stellar again.");
 		} catch (caught) {
 			setError(
 				caught instanceof Error
@@ -288,15 +288,16 @@ export function MockReview({
 				<header>
 					<h1>Review your basket</h1>
 					<p>
-						Confirm to create a Stellar bucket and deposit DEMOUSD into the
-						vault.
+						Confirm to create a Stellar bucket and deposit{" "}
+						<StableTokenLabel token="USDC" /> into the vault.
 					</p>
 					{error ? (
 						<p className="review-error" role="alert">
 							{error}
 						</p>
 					) : null}
-					{error?.includes("DEMOUSD") ||
+					{error?.includes("USDC") ||
+					error?.includes("DEMOUSD") ||
 					(walletBalance !== undefined && walletBalance < total) ? (
 						<button
 							type="button"
@@ -304,7 +305,7 @@ export function MockReview({
 							disabled={!wallet || faucetBusy || loading}
 							onClick={() => void claimFaucet()}
 						>
-							{faucetBusy ? "Minting DEMOUSD…" : "Get testnet DEMOUSD"}
+							{faucetBusy ? "Minting USDC…" : "Get testnet USDC"}
 						</button>
 					) : null}
 					{statusLine && phase !== "refreshing" ? (
@@ -420,7 +421,7 @@ export function MockReview({
 					</div>
 				) : (
 					<div className="live-disclosure">
-						Live Stellar testnet: create_bucket → approve DEMOUSD → deposit into
+						Live Stellar testnet: create_bucket → approve USDC → deposit into
 						vault {shortStellarAddress(stellarConfig.vault)}. You will sign 3
 						Freighter prompts.
 					</div>

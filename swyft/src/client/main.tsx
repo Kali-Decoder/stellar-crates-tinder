@@ -13,9 +13,11 @@ import instrumentSerifRegularUrl from "@fontsource/instrument-serif/files/instru
 import { isMockUi } from "./mock/enabled";
 import { MockApp } from "./mock/MockApp";
 import { applyStoredTheme } from "./theme";
+import { installUiClickSounds } from "./swipe-sounds";
 import "./styles.css";
 
 applyStoredTheme();
+installUiClickSounds();
 
 preload(instrumentSerifRegularUrl, {
 	as: "font",

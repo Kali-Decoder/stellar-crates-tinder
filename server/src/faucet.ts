@@ -68,7 +68,7 @@ export async function runDemoUsdFaucet(input: {
 			status: 502,
 			body: {
 				error: trustlineMissing
-					? "DEMOUSD trustline required — approve the Freighter trustline prompt, then retry"
+					? "USDC trustline required — approve the Freighter trustline prompt, then retry"
 					: "faucet mint failed",
 				detail,
 			},

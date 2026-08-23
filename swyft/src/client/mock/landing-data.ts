@@ -241,7 +241,7 @@ export const LANDING_FAQS: LandingFaq[] = [
 		id: "wallet",
 		question: "Do I need a crypto wallet or crypto to start investing?",
 		answer:
-			"You’ll connect a Stellar wallet (Freighter works great). On testnet you use DEMOUSD; nothing moves without your signature.",
+			"You’ll connect a Stellar wallet (Freighter works great). On testnet you use USDC; nothing moves without your signature.",
 	},
 	{
 		id: "custody",

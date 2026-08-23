@@ -808,9 +808,10 @@ export function SwipeCard({
 					className="card-hover-reject"
 					onClick={() => onSwipe(false)}
 					disabled={busy}
-					aria-label="Reject asset"
+					aria-label="Skip asset"
 				>
-					<X size={32} strokeWidth={2.6} aria-hidden="true" />
+					<X size={18} strokeWidth={2.6} aria-hidden="true" />
+					Skip
 				</button>
 				<button
 					type="button"
@@ -819,7 +820,8 @@ export function SwipeCard({
 					disabled={busy || !canAdd}
 					aria-label="Add asset"
 				>
-					<Heart size={30} strokeWidth={2.4} fill="currentColor" aria-hidden="true" />
+					<Heart size={16} strokeWidth={2.4} fill="currentColor" aria-hidden="true" />
+					Add
 				</button>
 			</div>
 

@@ -64,8 +64,42 @@ export function usdToUsdcBaseUnits(usd: number): bigint {
 	return BigInt(Math.round(usd * 10 ** USDC_DECIMALS));
 }
 
+/** Classic DEMOUSD trustline balance from Horizon (7 decimals). */
+async function readClassicDemoUsdBalance(owner: string): Promise<bigint> {
+	const issuer = stellarConfig.usdcIssuer;
+	if (!owner || !issuer) return 0n;
+	try {
+		const response = await fetch(
+			`${STELLAR_HORIZON_URL}/accounts/${encodeURIComponent(owner)}`,
+		);
+		if (response.status === 404) return 0n;
+		if (!response.ok) return 0n;
+		const data = (await response.json()) as {
+			balances?: Array<{
+				asset_type: string;
+				asset_code?: string;
+				asset_issuer?: string;
+				balance: string;
+			}>;
+		};
+		const line = data.balances?.find(
+			(entry) =>
+				entry.asset_code === "DEMOUSD" && entry.asset_issuer === issuer,
+		);
+		if (!line?.balance) return 0n;
+		return parseStellarAmount(line.balance, USDC_DECIMALS);
+	} catch {
+		return 0n;
+	}
+}
+
 export async function readUsdcBalance(owner: string): Promise<bigint> {
-	return readTokenBalance(stellarConfig.usdc, owner);
+	const [sac, classic] = await Promise.all([
+		readTokenBalance(stellarConfig.usdc, owner),
+		readClassicDemoUsdBalance(owner),
+	]);
+	// Prefer SAC; fall back to Horizon trustline (more reliable right after faucet).
+	return sac > 0n ? sac : classic;
 }
 
 /** Native XLM balance in stroops (7 decimals) from Horizon. */

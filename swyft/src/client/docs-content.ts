@@ -39,7 +39,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 			"Swipe right to add, left to skip — stay inside your budget",
 			"Review → Invest on Stellar (3 Freighter prompts) or Simulate only",
 		],
-		note: "On testnet the vault stablecoin is DEMOUSD, labeled USDC in the UI.",
+		note: "On Stellar testnet the vault settles in USDC.",
 	},
 	{
 		id: "wallet",
@@ -51,7 +51,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 		],
 		bullets: [
 			"Network: Stellar testnet",
-			"Stablecoin: DEMOUSD (shown as USDC)",
+			"Stablecoin: USDC",
 			"Signatures: three Freighter prompts per live invest",
 		],
 	},
@@ -86,13 +86,13 @@ export const DOCS_SECTIONS: DocsSection[] = [
 	{
 		id: "invest",
 		title: "Investing on Stellar",
-		summary: "Create a personal bucket and deposit DEMOUSD.",
+		summary: "Create a personal bucket and deposit USDC.",
 		body: [
-			"Live invest runs create_bucket → approve DEMOUSD → deposit into the Soroban vault. Equal-weight allocations are built from on-chain symbols in your selection.",
+			"Live invest runs create_bucket → approve USDC → deposit into the Soroban vault. Equal-weight allocations are built from on-chain symbols in your selection.",
 			"Simulate only settles a mock receipt without broadcasting — useful for UI checks when your testnet balance is empty.",
 		],
 		bullets: [
-			"Need enough DEMOUSD on Freighter for the spend amount",
+			"Need enough USDC on Freighter for the spend amount",
 			"Vault mints share tokens representing your bucket",
 			"Successful invests are recorded to the portfolio API (Mongo)",
 		],
@@ -132,7 +132,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 		summary: "Client, Soroban contracts, oracle, and portfolio API.",
 		body: [
 			"swyft.fun’s default product path is a Vite React client (MockApp) talking to Stellar testnet through Freighter / Stellar Wallets Kit. Feeds and charts hit DIA (and optional Yahoo history) via Vite proxies. Basket metadata and marked PnL persist in the sibling Express portfolio API when Mongo is configured.",
-			"On-chain, each invest creates a personal bucket in bucket-vault, deploys a share-token instance for that bucket, pulls DEMOUSD on deposit, and prices holdings through dia-oracle. Users hold basket shares — not the underlying RWA tokens — until withdraw.",
+			"On-chain, each invest creates a personal bucket in bucket-vault, deploys a share-token instance for that bucket, pulls USDC on deposit, and prices holdings through dia-oracle. Users hold basket shares — not the underlying RWA tokens — until withdraw.",
 		],
 		bullets: [
 			"Client — MockApp stages: landing → onboarding → swipe → review → portfolio / activity / account",
@@ -149,7 +149,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 		title: "Rebalancing",
 		summary: "How buckets stay near target weights after deposit.",
 		body: [
-			"When you invest, Review builds equal-weight targets across deployable symbols (target_bps sum to exactly 10_000). Deposit parks DEMOUSD in your bucket and mints shares. Holdings start as idle USDC — they do not instantly match the target mix until a rebalance runs.",
+			"When you invest, Review builds equal-weight targets across deployable symbols (target_bps sum to exactly 10_000). Deposit parks USDC in your bucket and mints shares. Holdings start as idle USDC — they do not instantly match the target mix until a rebalance runs.",
 			"rebalance(bucket_id, …) is permissionless on bucket-vault. Anyone (typically a keeper) can call it. The vault prices every leg via DIA, compares actual USD weights to targets, and skips work if drift is within drift_bps (deployed around 2%) or the notional is under a $1 dust floor.",
 			"When a leg is overweight, the vault sells that asset into USDC against an internal constant-product pool. When underweight, it spends idle USDC to buy. NAV always uses oracle prices, not the pool mid. Slippage is capped on-chain (≤ 10%); callers pass min_outs so a malicious keeper cannot sandwich freely.",
 		],
@@ -170,7 +170,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
 		body: [],
 		bullets: [
 			"Is this financial advice? No — ranking and cards are not advice.",
-			"Do I need mainnet funds? No — use Stellar testnet + DEMOUSD for the demo vault.",
+			"Do I need mainnet funds? No — use Stellar testnet + USDC for the demo vault.",
 			"Why SESSION_NOT_FOUND? Refresh quotes; mock sessions revive after hot reload.",
 			"Why synthetic charts? Yahoo can 429 or fail TLS; DIA spot still drives the level.",
 			"Why is my basket still mostly USDC? Deposit parks USDC; rebalance moves toward target weights.",

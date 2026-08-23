@@ -104,10 +104,10 @@ export async function claimTestnetDemoUsd(params: {
 	onPhase?.("Funding XLM via Friendbot…");
 	await fundWithFriendbot(wallet);
 
-	onPhase?.("Approve DEMOUSD trustline in Freighter…");
+	onPhase?.("Approve USDC trustline in Freighter…");
 	await ensureDemoUsdTrustline(wallet);
 
-	onPhase?.("Minting DEMOUSD…");
+	onPhase?.("Minting USDC…");
 	const minted = await requestDemoUsdFaucet({
 		wallet,
 		amountUsd,

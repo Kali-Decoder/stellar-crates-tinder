@@ -165,7 +165,7 @@ export function MockAccount({
 				onPhase: setFaucetMessage,
 			});
 			setFaucetMessage(
-				`Minted ${result.amountUsd.toFixed(0)} DEMOUSD to your wallet.`,
+				`Minted ${result.amountUsd.toFixed(0)} USDC to your wallet.`,
 			);
 			await loadBalances();
 		} catch (caught) {
@@ -240,7 +240,7 @@ export function MockAccount({
 									: "—"
 								: formatBaseUnits(usdcBaseUnits, USDC_DECIMALS)}
 						</strong>
-						<em>DEMOUSD on testnet</em>
+						<em>Stellar testnet</em>
 					</div>
 					<div className="trader-balance-card">
 						<small>XLM</small>
@@ -267,10 +267,10 @@ export function MockAccount({
 						onClick={() => void claimFaucet()}
 					>
 						<HandCoins size={16} strokeWidth={2.2} aria-hidden="true" />
-						{faucetBusy ? "Minting…" : "Get testnet DEMOUSD"}
+						{faucetBusy ? "Minting…" : "Get testnet USDC"}
 					</button>
 					<p>
-						Funds Freighter: Friendbot XLM → you sign a DEMOUSD trustline →
+						Funds Freighter: Friendbot XLM → you sign a USDC trustline →
 						issuer mints 1,000. Requires Testnet Freighter + `npm run
 						dev:stack`.
 					</p>
@@ -307,7 +307,9 @@ export function MockAccount({
 						<dd>{shortStellarAddress(stellarConfig.vault)}</dd>
 					</div>
 					<div>
-						<dt>DEMOUSD</dt>
+						<dt>
+							<StableTokenLabel token="USDC" />
+						</dt>
 						<dd>{shortStellarAddress(stellarConfig.usdc)}</dd>
 					</div>
 					<div>

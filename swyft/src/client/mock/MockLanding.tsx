@@ -209,32 +209,31 @@ function HeroSection({
 }) {
 	return (
 		<section className="landing-section landing-hero">
-			<div
-				className="landing-copy landing-reveal is-in"
-				style={{ "--d": "80ms" } as CSSProperties}
-			>
-				<h1>
-					Investing for <em>Everyone</em>
+			<div className="landing-copy">
+				<h1 className="landing-hero-title">
+					<span className="landing-hero-brand">swyft.fun</span>
+					<span className="landing-hero-lead">
+						non-custodial investing that feels like a{" "}
+						<em>swipe</em>, not a spreadsheet.
+					</span>
 				</h1>
-				<p>
-					Share your goals, choose the ideas you like, and build your portfolio
-					in 2 minutes.
+				<p className="landing-hero-sub">
+					Tokenized RWAs. Stellar settlement. Freighter signatures. Nothing leaves
+					your wallet without you.
 				</p>
-				<button
-					type="button"
-					className="landing-cta"
-					onClick={onSignIn}
-					disabled={signingIn}
-				>
-					{ctaLabel}
-				</button>
-				<small>Simple to start. No minimum amount required.</small>
+				<div className="landing-hero-actions">
+					<button
+						type="button"
+						className="landing-cta"
+						onClick={onSignIn}
+						disabled={signingIn}
+					>
+						{ctaLabel}
+					</button>
+				</div>
 			</div>
 
-			<div
-				className="landing-reveal is-in"
-				style={{ "--d": "180ms" } as CSSProperties}
-			>
+			<div className="landing-hero-visual">
 				<LandingBasketDeck />
 			</div>
 		</section>
