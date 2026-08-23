@@ -1,7 +1,9 @@
 import { Account, Contract, Networks, TransactionBuilder, xdr } from "@stellar/stellar-sdk";
 import { scValToNative } from "@stellar/stellar-sdk";
 import {
+	STELLAR_HORIZON_URL,
 	USDC_DECIMALS,
+	XLM_DECIMALS,
 	hasStellarToken,
 	stellarConfig,
 	stellarTokenAddress,
@@ -64,6 +66,46 @@ export function usdToUsdcBaseUnits(usd: number): bigint {
 
 export async function readUsdcBalance(owner: string): Promise<bigint> {
 	return readTokenBalance(stellarConfig.usdc, owner);
+}
+
+/** Native XLM balance in stroops (7 decimals) from Horizon. */
+export async function readXlmBalance(owner: string): Promise<bigint> {
+	if (!owner) return 0n;
+	try {
+		const response = await fetch(
+			`${STELLAR_HORIZON_URL}/accounts/${encodeURIComponent(owner)}`,
+		);
+		if (response.status === 404) return 0n;
+		if (!response.ok) return 0n;
+		const data = (await response.json()) as {
+			balances?: Array<{ asset_type: string; balance: string }>;
+		};
+		const native = data.balances?.find(
+			(entry) => entry.asset_type === "native",
+		);
+		if (!native?.balance) return 0n;
+		return parseStellarAmount(native.balance, XLM_DECIMALS);
+	} catch {
+		return 0n;
+	}
+}
+
+export async function readWalletBalances(owner: string): Promise<{
+	usdcBaseUnits: bigint;
+	xlmBaseUnits: bigint;
+}> {
+	const [usdcBaseUnits, xlmBaseUnits] = await Promise.all([
+		readUsdcBalance(owner),
+		readXlmBalance(owner),
+	]);
+	return { usdcBaseUnits, xlmBaseUnits };
+}
+
+function parseStellarAmount(value: string, decimals: number): bigint {
+	const [wholeRaw, fracRaw = ""] = value.split(".");
+	const whole = wholeRaw.replace(/^0+(?=\d)/, "") || "0";
+	const frac = `${fracRaw}${"0".repeat(decimals)}`.slice(0, decimals);
+	return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(frac || "0");
 }
 
 async function readTokenBalance(tokenId: string, owner: string): Promise<bigint> {

@@ -3650,6 +3650,124 @@ html[data-chain="stellar"] .onboarding-chain-selector button.active {
   border-color: color-mix(in srgb, var(--acid) 35%, var(--line));
   transform: translateY(-1px);
 }
+.trader-wallet-balances {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+}
+.trader-wallet-balances .trader-panel-head {
+  margin-bottom: 12px;
+}
+.trader-wallet-balances .trader-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.trader-wallet-balances .trader-link-button:disabled {
+  opacity: .55;
+  cursor: default;
+  text-decoration: none;
+}
+.trader-wallet-balances .is-spinning {
+  animation: spin .8s linear infinite;
+}
+.trader-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.trader-balance-card {
+  display: grid;
+  gap: 4px;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ground) 40%, var(--paper));
+}
+.trader-balance-card small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.trader-balance-card strong {
+  font: 800 26px/1.05 var(--font-body);
+  letter-spacing: -0.03em;
+}
+.trader-balance-card em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+.trader-balances-error {
+  margin: 10px 0 0;
+  color: var(--coral);
+  font-size: 12px;
+  font-weight: 700;
+}
+.trader-faucet-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.trader-faucet-row .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  width: fit-content;
+}
+.trader-faucet-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.trader-faucet-ok {
+  margin: 8px 0 0;
+  color: color-mix(in srgb, var(--acid) 70%, var(--ink));
+  font-size: 12px;
+  font-weight: 700;
+}
+.trader-deploy-meta {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.trader-deploy-meta > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.trader-deploy-meta > div:last-child { border-bottom: 0; }
+.trader-deploy-meta dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.trader-deploy-meta dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.review-faucet-button {
+  margin-top: 10px;
+  min-height: 42px;
+}
 .trader-stat small {
   color: var(--muted);
   font-size: 10px;
@@ -4306,6 +4424,7 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
   .trader-avatar { width: 72px; height: 72px; font-size: 24px; }
   .trader-profile-intro h1 { font-size: 34px; }
   .trader-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trader-balance-grid { grid-template-columns: 1fr; }
   .trader-actions { grid-template-columns: 1fr; }
   .account-balance { margin-top: 22px; padding: 20px; }
   .account-balance strong { font-size: 39px; }

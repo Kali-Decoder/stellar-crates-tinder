@@ -285,12 +285,10 @@ if (needSeeding.length) {
 const seeded = [...selected].filter((a) => STATE.seeded?.[a.symbol]).length;
 console.log(`${seeded}/${selected.length} pools ready`);
 
-/// Build all approve+seed txs up front with preallocated sequence numbers,
-/// then fire chunks concurrently. Turns ~6s/tx CLI spawns into ~6s/12txs.
+/// Build approve+seed txs and submit one-by-one with fresh sequence numbers.
 async function pipelineSeed(assets, expiryLedger) {
 	const server = new rpc.Server(process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org");
 	const kp = Keypair.fromSecret(sh(["keys", "secret", "demo-admin"], { quiet: true, network: false }).trim());
-	const acc = await server.getAccount(kp.publicKey());
 
 	const A = (s) => new Address(s).toScVal();
 	const i128 = (n) => nativeToScVal(BigInt(n), { type: "i128" });
@@ -314,71 +312,92 @@ async function pipelineSeed(assets, expiryLedger) {
 			[A(STATE.tokens[a.symbol]), i128(String(BigInt(POOL_USD) * 10_000_000n)), i128(assetAmt)]]);
 	}
 
-	let seq = BigInt(acc.sequence);
-	const built = [];
-	for (const entry of ops) {
-		const account = new Account(kp.publicKey(), seq.toString());
-		seq += 1n;
-		const tx = new TransactionBuilder(account, { fee: "2000000", networkPassphrase: Networks.TESTNET })
-			.addOperation(new Contract(entry[1]).call(entry[2], ...entry[3]))
-			.setTimeout(180)
-			.build();
-		tx.sign(kp);
-		built.push({ entry, tx });
-	}
-
 	const failures = new Set();
-	const CHUNK = 12;
-	for (let i = 0; i < built.length; i += CHUNK) {
-		const results = await Promise.allSettled(
-			built.slice(i, i + CHUNK).map(async ({ entry, tx }) => {
-				let sent = await server.sendTransaction(tx);
-				if (!sent.hash) throw new Error(JSON.stringify(sent));
-				let s = sent;
-				const deadline = Date.now() + 90000;
-				while ((s.status === "PENDING" || s.status === "NOT_FOUND") && Date.now() < deadline) {
-					await new Promise((r) => setTimeout(r, 1500));
-					s = await server.getTransaction(sent.hash);
-				}
-				if (s.status !== "SUCCESS") throw new Error(`${s.status}`);
-			}),
-		);
-		results.forEach((r, j) => {
-			const [label] = built[i + j].entry;
-			if (r.status === "rejected") {
-				console.error(`  ${label}: ${String(r.reason?.message ?? r.reason).slice(0, 140)}`);
-				failures.add(label.split("-")[0]);
+	for (const entry of ops) {
+		const [label, contractId, method, args] = entry;
+		try {
+			const acc = await server.getAccount(kp.publicKey());
+			const tx = new TransactionBuilder(acc, {
+				fee: "2000000",
+				networkPassphrase: Networks.TESTNET,
+			})
+				.addOperation(new Contract(contractId).call(method, ...args))
+				.setTimeout(180)
+				.build();
+			const simulated = await server.simulateTransaction(tx);
+			if (simulated.error) throw new Error(simulated.error);
+			const assembled = rpc.assembleTransaction(tx, simulated).build();
+			assembled.sign(kp);
+			let sent = await server.sendTransaction(assembled);
+			if (!sent.hash) throw new Error(JSON.stringify(sent));
+			let s = sent;
+			const deadline = Date.now() + 90000;
+			while (
+				(s.status === "PENDING" || s.status === "NOT_FOUND") &&
+				Date.now() < deadline
+			) {
+				await new Promise((r) => setTimeout(r, 1500));
+				s = await server.getTransaction(sent.hash);
 			}
-		});
+			if (s.status !== "SUCCESS") throw new Error(`${s.status}`);
+			console.log(`  ${label}: ok`);
+		} catch (err) {
+			console.error(
+				`  ${label}: ${String(err?.message ?? err).slice(0, 200)}`,
+			);
+			failures.add(label.split("-")[0]);
+		}
 	}
 	return failures;
 }
 
 if (!STATE.buckets) {
 	console.log("\n== example buckets");
-	const allocs = (symbols, bpsEach) =>
+	const allocs = (parts) =>
 		"[" +
-		symbols
-			.map((s) => `{"asset":"${STATE.tokens[s]}","dia_key":"${s}/USD","target_bps":${bpsEach}}`)
+		parts
+			.map(
+				([s, bps]) =>
+					`{"asset":"${STATE.tokens[s]}","dia_key":"${s}/USD","target_bps":${bps}}`,
+			)
 			.join(",") +
 		"]";
-	const mag7 = ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA"];
-	const hard = ["XAU", "XAGG", "WTI"];
-	const ready = mag7.every((s) => STATE.tokens[s]) && hard.every((s) => STATE.tokens[s]);
+	// target_bps must sum to exactly 10_000
+	const mag7 = [
+		["AAPL", 1429],
+		["MSFT", 1429],
+		["GOOG", 1429],
+		["AMZN", 1429],
+		["NVDA", 1428],
+		["META", 1428],
+		["TSLA", 1428],
+	];
+	const hard = [
+		["XAU", 3334],
+		["XAGG", 3333],
+		["WTI", 3333],
+	];
+	const ready =
+		mag7.every(([s]) => STATE.tokens[s] && STATE.seeded?.[s]) &&
+		hard.every(([s]) => STATE.tokens[s] && STATE.seeded?.[s]);
 	if (!ready) {
-		console.log("subset run without all bucket tokens; skipping example buckets");
+		console.log("pools not ready for example buckets; skipping");
 	} else {
-		invoke(STATE.vault, "demo-admin", "create_bucket", [
-			["name", '"Magnificent Seven"'],
-			["allocations", allocs(mag7, 1400)],
-		]);
-		invoke(STATE.vault, "demo-admin", "create_bucket", [
-			["name", '"Hard Assets"'],
-			["allocations", allocs(hard, 3400)],
-		]);
+		try {
+			invoke(STATE.vault, "demo-admin", "create_bucket", [
+				["name", '"Magnificent Seven"'],
+				["allocations", allocs(mag7)],
+			]);
+			invoke(STATE.vault, "demo-admin", "create_bucket", [
+				["name", '"Hard Assets"'],
+				["allocations", allocs(hard)],
+			]);
+			STATE.buckets = { mag7: 0, hardAssets: 1 };
+			save();
+		} catch (err) {
+			console.error(`example buckets skipped: ${err.message?.slice(0, 200)}`);
+		}
 	}
-	STATE.buckets = { mag7: 0, hardAssets: 1 };
-	save();
 }
 
 console.log("\n== deployment complete");

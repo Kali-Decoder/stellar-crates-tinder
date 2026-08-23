@@ -1,5 +1,6 @@
 import type { Express, Request, Response, Router } from "express";
 import { Router as createRouter } from "express";
+import { runDemoUsdFaucet } from "./faucet.js";
 import { createPortfolioHandlers } from "./service.js";
 
 export function createStellarPortfolioRouter(): Router {
@@ -19,6 +20,19 @@ export function createStellarPortfolioRouter(): Router {
 			});
 		}
 	};
+
+	router.post("/faucet", (request, response) =>
+		void send(response, () =>
+			runDemoUsdFaucet({
+				wallet: String(request.body?.wallet ?? ""),
+				amountUsd:
+					request.body?.amountUsd !== undefined
+						? Number(request.body.amountUsd)
+						: undefined,
+				friendbot: Boolean(request.body?.friendbot),
+			}),
+		),
+	);
 
 	router.post("/baskets", (request, response) =>
 		void send(response, () => h.createBasket(request.body)),

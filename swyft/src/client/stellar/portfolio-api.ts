@@ -73,11 +73,13 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
 		error?: unknown;
 	};
 	if (!response.ok) {
-		throw new Error(
-			typeof body.error === "string"
-				? body.error
-				: `Portfolio API ${response.status}`,
-		);
+		const detail =
+			typeof (body as { detail?: unknown }).detail === "string"
+				? String((body as { detail: string }).detail)
+				: "";
+		const message =
+			typeof body.error === "string" ? body.error : `Portfolio API ${response.status}`;
+		throw new Error(detail ? `${message}: ${detail.slice(0, 280)}` : message);
 	}
 	return body;
 }
@@ -151,5 +153,24 @@ export function getStellarBasketPnl(id: string) {
 export function getWalletPortfolio(wallet: string) {
 	return jsonFetch<WalletPortfolioPayload>(
 		`/api/stellar/wallets/${encodeURIComponent(wallet)}/portfolio`,
+	);
+}
+
+/** Testnet DEMOUSD mint via portfolio API → Stellar CLI issuer. */
+export function requestDemoUsdFaucet(params: {
+	wallet: string;
+	amountUsd?: number;
+	friendbot?: boolean;
+}) {
+	return jsonFetch<{ ok: boolean; amountUsd: number }>(
+		"/api/stellar/faucet",
+		{
+			method: "POST",
+			body: JSON.stringify({
+				wallet: params.wallet,
+				amountUsd: params.amountUsd ?? 1000,
+				friendbot: params.friendbot ?? true,
+			}),
+		},
 	);
 }

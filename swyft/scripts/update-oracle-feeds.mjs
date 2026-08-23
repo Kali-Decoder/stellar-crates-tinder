@@ -94,9 +94,18 @@ async function once() {
 			"ORACLE_ID not set and no oracle in deploy.json / .stellar-deploy.json",
 		);
 	}
-	const hash = await pushPrices(oracleId, payload);
+	const BATCH = 20;
+	const hashes = [];
+	for (let i = 0; i < payload.length; i += BATCH) {
+		const chunk = payload.slice(i, i + BATCH);
+		const hash = await pushPrices(oracleId, chunk);
+		hashes.push(hash);
+		console.log(
+			`  batch ${Math.floor(i / BATCH) + 1}: ${chunk.length} feeds tx=${hash}`,
+		);
+	}
 	console.log(
-		`on-chain update ok (${payload.length} feeds) oracle=${oracleId} tx=${hash}`,
+		`on-chain update ok (${payload.length} feeds) oracle=${oracleId} batches=${hashes.length}`,
 	);
 	console.log(`cycle took ${((Date.now() - started) / 1000).toFixed(1)}s`);
 }

@@ -2,6 +2,7 @@ import deploy from "./deploy.json";
 
 export type StellarDeployConfig = {
 	admin: string;
+	usdcIssuer?: string;
 	oracle: string;
 	usdc: string;
 	vault: string;
@@ -13,6 +14,10 @@ export type StellarDeployConfig = {
 export const STELLAR_RPC_URL =
 	import.meta.env.VITE_STELLAR_RPC_URL ?? "https://soroban-testnet.stellar.org";
 
+export const STELLAR_HORIZON_URL =
+	import.meta.env.VITE_STELLAR_HORIZON_URL ??
+	"https://horizon-testnet.stellar.org";
+
 export const STELLAR_NETWORK_PASSPHRASE =
 	import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE ??
 	"Test SDF Network ; September 2015";
@@ -22,6 +27,9 @@ export const stellarConfig = deploy as StellarDeployConfig;
 
 /** DEMOUSD / vault USDC uses 7 decimals (Stellar asset contract). */
 export const USDC_DECIMALS = 7;
+
+/** Native XLM uses 7 decimals (stroops). */
+export const XLM_DECIMALS = 7;
 
 export function stellarTokenAddress(symbol: string): string | undefined {
 	const key = symbol.toUpperCase();

@@ -21,11 +21,12 @@ import {
 } from "../stellar/vault";
 import { hasStellarToken } from "../stellar/config";
 import { recordStellarBasket } from "../stellar/portfolio-api";
+import { claimTestnetDemoUsd } from "../stellar/faucet";
 import { shortStellarAddress } from "../stellar/kit";
 
 export function MockReview({
 	session,
-	feed,
+	feed: _feed,
 	selected,
 	onRemove,
 	onBack,
@@ -56,6 +57,7 @@ export function MockReview({
 	const [statusLine, setStatusLine] = useState("");
 	const [error, setError] = useState("");
 	const [walletBalance, setWalletBalance] = useState<number>();
+	const [faucetBusy, setFaucetBusy] = useState(false);
 	const [now, setNow] = useState(() => Date.now());
 	const total = Math.round(selected.length * ticketSizeUsd * 100) / 100;
 	const stableToken = "USDC";
@@ -163,7 +165,7 @@ export function MockReview({
 			const balance = await readUsdcBalance(wallet);
 			if (balance < needed) {
 				throw new Error(
-					`Need ${total.toFixed(2)} DEMOUSD on testnet (wallet has ${(Number(balance) / 10 ** USDC_DECIMALS).toFixed(2)}). Ask the demo faucet / admin to mint to your Freighter address.`,
+					`Need ${total.toFixed(2)} DEMOUSD on testnet (wallet has ${(Number(balance) / 10 ** USDC_DECIMALS).toFixed(2)}). Use Get testnet DEMOUSD on Profile, or the button below.`,
 				);
 			}
 
@@ -223,6 +225,30 @@ export function MockReview({
 		}
 	}
 
+	async function claimFaucet() {
+		if (!wallet || faucetBusy) return;
+		setFaucetBusy(true);
+		setError("");
+		try {
+			await claimTestnetDemoUsd({
+				wallet,
+				amountUsd: Math.max(1000, total * 2),
+				onPhase: setStatusLine,
+			});
+			const balance = await readUsdcBalance(wallet);
+			setWalletBalance(Number(balance) / 10 ** USDC_DECIMALS);
+			setStatusLine("DEMOUSD minted — try Invest on Stellar again.");
+		} catch (caught) {
+			setError(
+				caught instanceof Error
+					? caught.message
+					: "Faucet failed — Freighter on Testnet + npm run dev:stack",
+			);
+		} finally {
+			setFaucetBusy(false);
+		}
+	}
+
 	async function confirmMock() {
 		if (!record) return;
 		setLoading(true);
@@ -270,7 +296,18 @@ export function MockReview({
 							{error}
 						</p>
 					) : null}
-					{statusLine && phase === "signing" ? (
+					{error?.includes("DEMOUSD") ||
+					(walletBalance !== undefined && walletBalance < total) ? (
+						<button
+							type="button"
+							className="button button-outline review-faucet-button"
+							disabled={!wallet || faucetBusy || loading}
+							onClick={() => void claimFaucet()}
+						>
+							{faucetBusy ? "Minting DEMOUSD…" : "Get testnet DEMOUSD"}
+						</button>
+					) : null}
+					{statusLine && phase !== "refreshing" ? (
 						<p className="review-status" aria-live="polite">
 							{statusLine}
 						</p>
