@@ -154,6 +154,17 @@
   outline: 2px solid var(--landing-mint);
   outline-offset: 2px;
 }
+.landing-footer-social {
+  gap: 6px;
+  color: var(--landing-mint);
+  border-color: color-mix(in srgb, var(--landing-mint) 28%, transparent);
+  background: color-mix(in srgb, var(--landing-mint) 8%, transparent);
+}
+.landing-footer-social:hover {
+  color: var(--landing-mint-ink);
+  background: var(--landing-mint);
+  border-color: var(--landing-mint);
+}
 .landing-footer-actions {
   display: inline-flex;
   align-items: center;
@@ -655,6 +666,16 @@
   padding: 22px 20px 16px;
   box-shadow: 0 0 0 1px rgba(94, 176, 255, 0.05), 0 24px 60px rgba(0, 0, 0, 0.35);
 }
+.landing-perf-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px 20px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+.landing-perf-meta-copy {
+  min-width: 0;
+}
 .landing-perf-meta p {
   margin: 0 0 12px;
   color: #9aa3b2;
@@ -667,7 +688,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px 18px;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
   list-style: none;
   color: #c5ccd8;
@@ -680,6 +701,7 @@
   height: 8px;
   border-radius: 50%;
   margin-right: 6px;
+  vertical-align: 1px;
 }
 .landing-perf-plot {
   position: relative;
@@ -689,6 +711,7 @@
   width: 100%;
   height: auto;
   min-height: 240px;
+  display: block;
 }
 .landing-perf-grid {
   stroke: rgba(255, 255, 255, 0.06);
@@ -724,11 +747,10 @@
 }
 
 .landing-perf-currency {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: min(240px, 46vw);
-  z-index: 2;
+  position: relative;
+  flex: 0 0 auto;
+  width: min(220px, 100%);
+  z-index: 3;
 }
 .landing-currency-trigger {
   display: flex;
@@ -745,8 +767,38 @@
   cursor: pointer;
   box-shadow: 0 0 0 3px rgba(94, 176, 255, 0.12);
 }
+.landing-currency-label {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.landing-currency-label b {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.landing-currency-label span {
+  overflow: hidden;
+  color: #9aa3b2;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.landing-currency-trigger svg {
+  flex: 0 0 auto;
+  color: #9aa3b2;
+}
 .landing-currency-menu {
-  margin: 8px 0 0;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  z-index: 4;
+  margin: 0;
   padding: 6px;
   list-style: none;
   border-radius: 14px;
@@ -1359,10 +1411,15 @@
   .landing-assets-grid {
     grid-template-columns: 1fr;
   }
+  .landing-perf-meta {
+    grid-template-columns: 1fr;
+  }
   .landing-perf-currency {
-    position: static;
     width: 100%;
-    margin-top: 12px;
+  }
+  .landing-currency-menu {
+    left: 0;
+    right: 0;
   }
   .landing-faqs h2 {
     position: static;

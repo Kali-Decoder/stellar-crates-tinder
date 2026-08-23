@@ -14,6 +14,9 @@ import {
 	type CSSProperties,
 	type RefObject,
 } from "react";
+
+const TWITTER_HANDLE = "swyftdotfun";
+const TWITTER_URL = `https://x.com/${TWITTER_HANDLE}`;
 import {
 	LANDING_AI_PORTFOLIO,
 	LANDING_ASSET_CLASSES,
@@ -42,7 +45,7 @@ export function MockLanding({
 	const ctaLabel = signingIn
 		? "Connecting…"
 		: signedIn
-			? "Continue"
+			? "Launch App"
 			: "Sign in";
 
 	return (
@@ -141,6 +144,16 @@ export function MockLanding({
 								{label}
 							</a>
 						))}
+						<a
+							className="landing-footer-link landing-footer-social"
+							href={TWITTER_URL}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-label={`swyft.fun on X, @${TWITTER_HANDLE}`}
+						>
+							<span aria-hidden="true">𝕏</span>
+							@{TWITTER_HANDLE}
+						</a>
 					</nav>
 
 					<div className="landing-footer-actions">
@@ -250,36 +263,39 @@ function PerformanceSection() {
 
 			<div className={`landing-perf-card${inView ? " is-drawn" : ""}`}>
 				<div className="landing-perf-meta">
-					<p>
-						Start: August 2021 (5 Years). Starting value: <b>$10,000</b>
-					</p>
-					<ul className="landing-perf-legend">
-						<li>
-							<i style={{ background: "#3dd6c3" }} /> Modern Warfare Portfolio
-						</li>
-						<li>
-							<i style={{ background: "#f5c542" }} /> Trump Portfolio
-						</li>
-						<li>
-							<i style={{ background: "#5eb0ff" }} /> S&amp;P 500
-						</li>
-						<li>
-							<i style={{ background: "#ff7b72" }} /> {currency.code} cash
-						</li>
-					</ul>
-				</div>
+					<div className="landing-perf-meta-copy">
+						<p>
+							Start: August 2021 (5 Years). Starting value: <b>$10,000</b>
+						</p>
+						<ul className="landing-perf-legend">
+							<li>
+								<i style={{ background: "#3dd6c3" }} /> Modern Warfare Portfolio
+							</li>
+							<li>
+								<i style={{ background: "#f5c542" }} /> Trump Portfolio
+							</li>
+							<li>
+								<i style={{ background: "#5eb0ff" }} /> S&amp;P 500
+							</li>
+							<li>
+								<i style={{ background: "#ff7b72" }} /> {currency.code} cash
+							</li>
+						</ul>
+					</div>
 
-				<div className="landing-perf-plot">
-					<PerformanceChart active={inView} />
 					<div className="landing-perf-currency">
 						<button
 							type="button"
 							className="landing-currency-trigger"
 							aria-expanded={open}
+							aria-haspopup="listbox"
 							onClick={() => setOpen((value) => !value)}
 						>
 							<span aria-hidden="true">{currency.flag}</span>
-							{currency.code} {currency.name}
+							<span className="landing-currency-label">
+								<b>{currency.code}</b>
+								<span>{currency.name}</span>
+							</span>
 							<ChevronDown size={16} />
 						</button>
 						{open ? (
@@ -288,6 +304,8 @@ function PerformanceSection() {
 									<li key={item.code}>
 										<button
 											type="button"
+											role="option"
+											aria-selected={item.code === currency.code}
 											className={item.code === currency.code ? "active" : ""}
 											onClick={() => {
 												setCurrency(item);
@@ -305,6 +323,10 @@ function PerformanceSection() {
 					</div>
 				</div>
 
+				<div className="landing-perf-plot">
+					<PerformanceChart active={inView} />
+				</div>
+
 				<p className="landing-perf-note">
 					<Info size={14} /> Historical, normalized comparison. Local cash shows
 					the USD value of the same starting local-currency balance; it is not an
@@ -318,13 +340,21 @@ function PerformanceSection() {
 function PerformanceChart({ active }: { active: boolean }) {
 	const width = 720;
 	const height = 280;
-	const pad = { top: 16, right: 88, bottom: 28, left: 44 };
+	const pad = { top: 18, right: 92, bottom: 28, left: 12 };
 	const series = [
 		{ key: "modernWarfare", color: "#3dd6c3", end: LANDING_PERF_ENDINGS.modernWarfare, points: LANDING_PERF_SERIES.modernWarfare },
 		{ key: "trump", color: "#f5c542", end: LANDING_PERF_ENDINGS.trump, points: LANDING_PERF_SERIES.trump },
 		{ key: "sp500", color: "#5eb0ff", end: LANDING_PERF_ENDINGS.sp500, points: LANDING_PERF_SERIES.sp500 },
 		{ key: "cash", color: "#ff7b72", end: LANDING_PERF_ENDINGS.cash, points: LANDING_PERF_SERIES.cash },
 	] as const;
+
+	/** Nudge stacked end labels so they don't collide. */
+	const endNudge: Record<string, number> = {
+		modernWarfare: -6,
+		trump: 4,
+		sp500: 0,
+		cash: 0,
+	};
 
 	function toPath(values: readonly number[]) {
 		return values
@@ -363,8 +393,11 @@ function PerformanceChart({ active }: { active: boolean }) {
 			})}
 			{series.map((item, index) => {
 				const last = item.points[item.points.length - 1] ?? 0;
-				const x = width - pad.right + 8;
-				const y = pad.top + (1 - last) * (height - pad.top - pad.bottom);
+				const x = width - pad.right + 10;
+				const y =
+					pad.top +
+					(1 - last) * (height - pad.top - pad.bottom) +
+					(endNudge[item.key] ?? 0);
 				return (
 					<g key={item.key}>
 						<path

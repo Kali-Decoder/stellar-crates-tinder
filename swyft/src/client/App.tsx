@@ -41,6 +41,7 @@ import { ReceiptScreen } from "./components/ReceiptScreen";
 import { DocsScreen } from "./components/DocsScreen";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { SwipeCard } from "./components/SwipeCard";
+import { SwipeGestures } from "./components/SwipeGestures";
 import {
 	removeLegacyPreferences,
 	writeAccountPreferences,
@@ -758,18 +759,6 @@ export function App({ config }: { config: PublicConfig }) {
 							) : current ? (
 								<>
 									<div className="card-stage">
-										<button
-											type="button"
-											className="gesture gesture-skip"
-											onClick={() => animateDecision(false)}
-											aria-label="Skip asset"
-											disabled={Boolean(decisionFeedback)}
-										>
-											<span className="gesture-dir" aria-hidden="true">
-												Left
-											</span>
-											<span className="gesture-label">Skip</span>
-										</button>
 										<SwipeCard
 											candidate={current}
 											reason={currentFeedCard?.reason ?? current.reason}
@@ -780,18 +769,13 @@ export function App({ config }: { config: PublicConfig }) {
 											onInfoOpenChange={setAssetInfoOpen}
 											onSwipe={animateDecision}
 										/>
-										<button
-											type="button"
-											className="gesture gesture-add"
-											onClick={() => animateDecision(true)}
-											aria-label={`Add ${ticketSizeUsd} ${stableToken}`}
-											disabled={Boolean(decisionFeedback) || !canAddCurrent}
-										>
-											<span className="gesture-dir" aria-hidden="true">
-												Right
-											</span>
-											<span className="gesture-label">Add</span>
-										</button>
+										<SwipeGestures
+											onSkip={() => animateDecision(false)}
+											onAdd={() => animateDecision(true)}
+											addLabel={`Add ${ticketSizeUsd} ${stableToken}`}
+											disabled={Boolean(decisionFeedback)}
+											addDisabled={!canAddCurrent}
+										/>
 									</div>
 									{currentWarnings.length ? (
 										<aside className="ai-warnings" aria-label="0G warnings">

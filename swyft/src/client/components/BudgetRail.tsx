@@ -237,8 +237,16 @@ export function BudgetRail({
 						</ul>
 					) : (
 						<div className="basket-empty">
-							<p>Swipe right to add</p>
-							<small>Assets you add land here before you invest.</small>
+							<div className="basket-empty-orbit" aria-hidden="true">
+								<span className="basket-empty-chip">Skip</span>
+								<span className="basket-empty-pulse" />
+								<span className="basket-empty-chip is-add">Add</span>
+							</div>
+							<p>Swipe right to fill this basket</p>
+							<small>
+								Each Add spends one ticket. Review when you&apos;re ready to
+								invest on Stellar.
+							</small>
 						</div>
 					)}
 

@@ -29,6 +29,8 @@ import { Confetti } from "../components/magicui/confetti";
 import { ReceiptScreen } from "../components/ReceiptScreen";
 import { DocsScreen } from "../components/DocsScreen";
 import { SwipeCard } from "../components/SwipeCard";
+import { SwipeGestures } from "../components/SwipeGestures";
+import { STELLAR_SUPPORTED_ASSET_COUNT } from "../stellar/config";
 import { createMockApi } from "./api";
 import { MOCK_CONFIG } from "./data";
 import { MockAccount } from "./MockAccount";
@@ -37,6 +39,9 @@ import { MockOnboarding } from "./MockOnboarding";
 import { MockPositions } from "./MockPositions";
 import { MockReview } from "./MockReview";
 import { useStellarWallet } from "../stellar/useStellarWallet";
+
+const TWITTER_HANDLE = "swyftdotfun";
+const TWITTER_URL = `https://x.com/${TWITTER_HANDLE}`;
 
 installApiOverride(createMockApi() as typeof api);
 
@@ -255,6 +260,31 @@ export function MockApp() {
 		}, 300);
 	}
 
+	useEffect(() => {
+		if (stage !== "swipe" || view !== "week") return;
+		function onKeyDown(event: KeyboardEvent) {
+			const target = event.target as HTMLElement | null;
+			if (
+				target &&
+				(target.tagName === "INPUT" ||
+					target.tagName === "TEXTAREA" ||
+					target.isContentEditable)
+			) {
+				return;
+			}
+			if (event.key === "ArrowLeft") {
+				event.preventDefault();
+				animateDecision(false);
+			}
+			if (event.key === "ArrowRight") {
+				event.preventDefault();
+				animateDecision(true);
+			}
+		}
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [stage, view, current, decisionFeedback, canAddCurrent, selectedIds]);
+
 	function remove(assetId: string) {
 		setSelectedIds((ids) => ids.filter((id) => id !== assetId));
 		setFeedExhausted(false);
@@ -432,7 +462,11 @@ export function MockApp() {
 						<section className="swipe-workspace">
 							<header className="page-heading">
 								<h1>Build your basket</h1>
-								<p>Drag right to add · left to skip.</p>
+								<p>
+									Drag the card, tap Skip / Add, or use{" "}
+									<kbd className="inline-key">←</kbd>{" "}
+									<kbd className="inline-key">→</kbd>.
+								</p>
 							</header>
 							{error ? (
 								<div className="fatal-state">
@@ -468,33 +502,26 @@ export function MockApp() {
 											onInfoOpenChange={setAssetInfoOpen}
 											onSwipe={animateDecision}
 										/>
-										<div className="gesture-bar" role="group" aria-label="Swipe actions">
-											<button
-												type="button"
-												className="gesture gesture-skip"
-												onClick={() => animateDecision(false)}
-												aria-label="Skip asset"
-												disabled={Boolean(decisionFeedback)}
-											>
-												<span className="gesture-dir" aria-hidden="true">
-													Left
-												</span>
-												<span className="gesture-label">Skip</span>
-											</button>
-											<button
-												type="button"
-												className="gesture gesture-add"
-												onClick={() => animateDecision(true)}
-												aria-label={`Add ${ticketSizeUsd} ${stableToken}`}
-												disabled={Boolean(decisionFeedback) || !canAddCurrent}
-											>
-												<span className="gesture-dir" aria-hidden="true">
-													Right
-												</span>
-												<span className="gesture-label">Add</span>
-											</button>
-										</div>
+										<SwipeGestures
+											onSkip={() => animateDecision(false)}
+											onAdd={() => animateDecision(true)}
+											addLabel={`Add ${ticketSizeUsd} ${stableToken}`}
+											disabled={Boolean(decisionFeedback)}
+											addDisabled={!canAddCurrent}
+										/>
 									</div>
+									<footer className="swipe-session-footer">
+										<span>
+											{STELLAR_SUPPORTED_ASSET_COUNT} assets on Stellar
+										</span>
+										<a
+											href={TWITTER_URL}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											@{TWITTER_HANDLE}
+										</a>
+									</footer>
 									{currentWarnings.length ? (
 										<aside className="ai-warnings" aria-label="Mock warnings">
 											<Bot aria-hidden="true" />
