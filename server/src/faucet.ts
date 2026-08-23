@@ -1,10 +1,19 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const FAUCET_SCRIPT = fileURLToPath(
 	new URL("../../swyft/scripts/faucet-demousd.mjs", import.meta.url),
 );
+
+function faucetEnv(): NodeJS.ProcessEnv {
+	const homeBin = path.join(homedir(), ".local", "bin");
+	const pathParts = (process.env.PATH ?? "").split(path.delimiter);
+	if (!pathParts.includes(homeBin)) pathParts.unshift(homeBin);
+	return { ...process.env, PATH: pathParts.join(path.delimiter) };
+}
 
 /** Testnet DEMOUSD mint via Stellar CLI (demo-usdc-issuer). */
 export async function runDemoUsdFaucet(input: {
@@ -15,6 +24,15 @@ export async function runDemoUsdFaucet(input: {
 	const wallet = String(input.wallet ?? "").trim();
 	if (!/^G[A-Z0-9]{55}$/.test(wallet)) {
 		return { status: 400, body: { error: "invalid stellar address" } };
+	}
+	if (!existsSync(FAUCET_SCRIPT)) {
+		return {
+			status: 500,
+			body: {
+				error: "faucet script missing",
+				detail: FAUCET_SCRIPT,
+			},
+		};
 	}
 	const amount =
 		input.amountUsd && Number.isFinite(input.amountUsd) && input.amountUsd > 0
@@ -30,7 +48,7 @@ export async function runDemoUsdFaucet(input: {
 	}>((resolve) => {
 		const child = spawn(process.execPath, args, {
 			cwd: path.dirname(FAUCET_SCRIPT),
-			env: process.env,
+			env: faucetEnv(),
 		});
 		let stdout = "";
 		let stderr = "";
@@ -44,11 +62,15 @@ export async function runDemoUsdFaucet(input: {
 	});
 
 	if (result.code !== 0) {
+		const detail = (result.stderr || result.stdout).slice(0, 800);
+		const trustlineMissing = /trustline entry is missing/i.test(detail);
 		return {
 			status: 502,
 			body: {
-				error: "faucet mint failed",
-				detail: (result.stderr || result.stdout).slice(0, 800),
+				error: trustlineMissing
+					? "DEMOUSD trustline required — approve the Freighter trustline prompt, then retry"
+					: "faucet mint failed",
+				detail,
 			},
 		};
 	}

@@ -75,21 +75,36 @@ if (friendbot) {
 
 console.log(`minting ${(Number(amount) / 1e7).toFixed(2)} DEMOUSD → ${wallet}`);
 console.log(`usdc=${usdc}`);
+console.log(
+	"(Recipient must already have a DEMOUSD trustline — the UI opens this via Freighter.)",
+);
 
-sh([
-	"contract",
-	"invoke",
-	"--id",
-	usdc,
-	"--source-account",
-	"demo-usdc-issuer",
-	...NETWORK,
-	"--",
-	"mint",
-	"--to",
-	wallet,
-	"--amount",
-	amount,
-]);
+try {
+	sh([
+		"contract",
+		"invoke",
+		"--id",
+		usdc,
+		"--source-account",
+		"demo-usdc-issuer",
+		...NETWORK,
+		"--",
+		"mint",
+		"--to",
+		wallet,
+		"--amount",
+		amount,
+	]);
+} catch (err) {
+	const msg = err instanceof Error ? err.message : String(err);
+	if (/trustline entry is missing/i.test(msg)) {
+		console.error(
+			"\nMint failed: wallet has no DEMOUSD trustline.\n" +
+				"In the app, use Get testnet DEMOUSD (signs change-trust), or:\n" +
+				`  stellar tx new change-trust --line DEMOUSD:${deploy.usdcIssuer} --source-account <YOUR_KEY>`,
+		);
+	}
+	throw err;
+}
 
 console.log("faucet ok");
