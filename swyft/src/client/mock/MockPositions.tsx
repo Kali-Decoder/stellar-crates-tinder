@@ -94,7 +94,7 @@ export function MockPositions({ wallet }: { wallet: string; candidates?: unknown
 
 			<div className="positions-list">
 				{portfolio?.baskets.map((basket) => (
-					<article className="position-row basket-row" key={basket.id}>
+					<article className="position-row" key={basket.id}>
 						<div className="position-copy">
 							<strong>
 								{basket.name} · #{basket.bucketId}

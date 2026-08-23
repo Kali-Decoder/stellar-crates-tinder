@@ -24,7 +24,7 @@ import {
 } from "../api";
 import { AppShell } from "../components/AppShell";
 import { AssetIconProvider } from "../components/AssetMark";
-import { BudgetRail, BudgetSummary } from "../components/BudgetRail";
+import { BudgetRail } from "../components/BudgetRail";
 import { ArrowRight } from "../components/Icons";
 import { Confetti } from "../components/magicui/confetti";
 import { ReceiptScreen } from "../components/ReceiptScreen";
@@ -63,6 +63,8 @@ export function MockApp() {
 	const [decisionFeedback, setDecisionFeedback] = useState<DecisionFeedback>();
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [feedExhausted, setFeedExhausted] = useState(false);
+	const [basketSheetOpen, setBasketSheetOpen] = useState(false);
+	const [isCompact, setIsCompact] = useState(false);
 	const decisionTimer = useRef<number | undefined>(undefined);
 	const warningsByAssetId = useRef(new Map<string, string[]>());
 
@@ -141,6 +143,30 @@ export function MockApp() {
 		[],
 	);
 
+	useEffect(() => {
+		const media = window.matchMedia("(max-width: 760px)");
+		const sync = () => {
+			setIsCompact(media.matches);
+			if (!media.matches) setBasketSheetOpen(false);
+		};
+		sync();
+		media.addEventListener("change", sync);
+		return () => media.removeEventListener("change", sync);
+	}, []);
+
+	useEffect(() => {
+		if (!basketSheetOpen) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setBasketSheetOpen(false);
+		};
+		window.addEventListener("keydown", onKey);
+		document.documentElement.classList.add("basket-sheet-lock");
+		return () => {
+			window.removeEventListener("keydown", onKey);
+			document.documentElement.classList.remove("basket-sheet-lock");
+		};
+	}, [basketSheetOpen]);
+
 	const loadMoreCandidates = useCallback(async () => {
 		if (!feed || !preferences || !session || loadingMore || feedExhausted)
 			return;
@@ -204,8 +230,18 @@ export function MockApp() {
 		if (!current) return;
 		if (add && !selectedIds.includes(current.assetId) && canAddCurrent) {
 			setSelectedIds((ids) => [...ids, current.assetId]);
+			if (isCompact) {
+				// Brief pulse on the FAB without forcing the sheet open mid-swipe.
+				setBasketSheetOpen(false);
+			}
 		}
 		setIndex((value) => Math.min(value + 1, candidates.length));
+	}
+
+	function goReview() {
+		window.scrollTo({ top: 0, behavior: "auto" });
+		setBasketSheetOpen(false);
+		setStage("review");
 	}
 
 	function animateDecision(add: boolean) {
@@ -436,14 +472,6 @@ export function MockApp() {
 											</ul>
 										</aside>
 									) : null}
-									<BudgetSummary
-										selectedCount={selected.length}
-										ticketSizeUsd={ticketSizeUsd}
-										periodLimitUsd={periodLimitUsd}
-										activeChain={activeChain}
-										stableToken="USDC"
-										className="mobile-budget-summary"
-									/>
 									<div
 										className={`card-actions${selected.length ? " has-selection" : ""}`}
 									>
@@ -458,10 +486,7 @@ export function MockApp() {
 										<button
 											type="button"
 											className="button button-outline"
-											onClick={() => {
-												window.scrollTo({ top: 0, behavior: "auto" });
-												setStage("review");
-											}}
+											onClick={goReview}
 											disabled={!selected.length}
 										>
 											Review basket ({selected.length}) <ShoppingBasket />
@@ -506,10 +531,7 @@ export function MockApp() {
 										type="button"
 										className="button button-primary"
 										disabled={!selected.length}
-										onClick={() => {
-											window.scrollTo({ top: 0, behavior: "auto" });
-											setStage("review");
-										}}
+										onClick={goReview}
 									>
 										Review basket ({selected.length}) <ShoppingBasket />
 									</button>
@@ -530,6 +552,9 @@ export function MockApp() {
 							stableToken="USDC"
 							networkLabel="Stellar"
 							quoteLabel="Stellar"
+							sheetOpen={basketSheetOpen}
+							onSheetOpenChange={isCompact ? setBasketSheetOpen : undefined}
+							onReview={selected.length ? goReview : undefined}
 						/>
 						<section className="evidence-detail">
 							<div className="feed-method-copy">
