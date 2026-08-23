@@ -101,12 +101,14 @@ cd contracts && CARGO_TARGET_DIR=./target cargo test --workspace
 npm run build:contracts
 node scripts/deploy-stellar.mjs                 # idempotent; state in scripts/.stellar-deploy.json
 node scripts/update-oracle-feeds.mjs --watch    # keep oracle feeds fresh (batched set_prices)
-# sync UI addresses after deploy into:
-#   src/client/stellar/deploy.json
-#   (vault, usdc, oracle, tokens, shareWasmHash, admin, usdcIssuer)
+# deploy script syncs src/client/stellar/deploy.json automatically
 ```
 
-CLI identities used by deploy / faucet: `demo-admin`, `demo-usdc-issuer` (`stellar keys address demo-admin`).
+CLI identities used by deploy / faucet: `demo-admin`, `demo-usdc-issuer` — auto-generated + friendbot-funded by the deploy script when missing. Full reset: delete `scripts/.stellar-deploy.json` + `src/client/stellar/deploy.json`, then redeploy (old state files pin old addresses).
+
+### Lifecycle after invest
+
+`deposit` holds funds as idle USDC → **Rebalance** (Portfolio, one signature) deploys into target weights against vault pools — ±2% drift band, $1 min trade, UI sends 1% slippage bound via `min_outs`. **Withdraw** is two signatures: share-token `approve(vault)` allowance, then `withdraw(shares)` burns shares for the pro-rata payout of all holdings + idle USDC.
 
 ### Toolchain
 
@@ -126,14 +128,14 @@ Deploy state: [`scripts/.stellar-deploy.json`](./scripts/.stellar-deploy.json)
 
 | Role | Address |
 |---|---|
-| **Admin** (`demo-admin`) | `GAJFL4R3GOPEZYRASNWKKU7AGCS2Q4TGV7Q2YAGDIPHPR2ZWVF4C23DX` |
-| **DEMOUSD issuer** (`demo-usdc-issuer`) | `GDY4CLVS7F5MR2D3ZWAI7SZQAC3ZGIY72FLZ2NC473TDSAJ6NY3TEYSU` |
-| **dia-oracle** | [`CCLPSSKT6R2GYJ2Y55NA6ZM2P6IQB2MO47ZIHBJG5OJIDXSW6BLRNRF5`](https://stellar.expert/explorer/testnet/contract/CCLPSSKT6R2GYJ2Y55NA6ZM2P6IQB2MO47ZIHBJG5OJIDXSW6BLRNRF5) |
-| **DEMOUSD (SAC, 7 decimals)** | [`CBJ5NPXATRN4U34AGS3AIDFJLOY4KMXFDM4BJT5WYJ3MRY373DGZKELV`](https://stellar.expert/explorer/testnet/contract/CBJ5NPXATRN4U34AGS3AIDFJLOY4KMXFDM4BJT5WYJ3MRY373DGZKELV) |
-| **bucket-vault** | [`CDNUYNSIEOOJ7IYICJLHPQKLLKAYC62B2XR5C644GLUX3P22D6ZVKVO5`](https://stellar.expert/explorer/testnet/contract/CDNUYNSIEOOJ7IYICJLHPQKLLKAYC62B2XR5C644GLUX3P22D6ZVKVO5) |
-| **share-token wasm hash** | `4217581895c609e8be2e4789967f7938650763d5b8a0c9f4481fb67bad1ab0ef` |
+| **Admin** (`demo-admin`) | `GDVJOVCZBKQY5FIDMRFDEVCQ3M6MP2BG4KYPDO6FJ2KUOLQPUWIEIW2M` |
+| **DEMOUSD issuer** (`demo-usdc-issuer`) | `GAK7PGZIGH2ASZY6LF762ACROPQGBF7X4ZNUMPIMMOEP5ZFTGWTSA4TY` |
+| **dia-oracle** | [`CDME5DBWV5CRHY6WHIN2KPDLMPJVHKH2J3PWY6AFILIC7HRZHAJF2T6A`](https://stellar.expert/explorer/testnet/contract/CDME5DBWV5CRHY6WHIN2KPDLMPJVHKH2J3PWY6AFILIC7HRZHAJF2T6A) |
+| **DEMOUSD (SAC, 7 decimals)** | [`CDLPZ6OAYSNO4LNXKL3GCLG57KTOQRBXWEE775XO3CUC4Y7GOBV2CRAA`](https://stellar.expert/explorer/testnet/contract/CDLPZ6OAYSNO4LNXKL3GCLG57KTOQRBXWEE775XO3CUC4Y7GOBV2CRAA) |
+| **bucket-vault** | [`CDRVFECRSEWANIVJJVGGPPAM4VKKDVJLL2NQYRZQNNQN3P27AH4EELKQ`](https://stellar.expert/explorer/testnet/contract/CDRVFECRSEWANIVJJVGGPPAM4VKKDVJLL2NQYRZQNNQN3P27AH4EELKQ) |
+| **share-token wasm hash** | `62d2e1ad01c76bb7f6ca8c244e0341b9e0f9a11a66482154cad45422caf118d0` |
 
-Settlement asset in the UI is labeled **USDC**; on-chain it is the **DEMOUSD** SAC above. Classic code: `DEMOUSD:GDY4CLVS7F5MR2D3ZWAI7SZQAC3ZGIY72FLZ2NC473TDSAJ6NY3TEYSU`.
+Settlement asset in the UI is labeled **USDC**; on-chain it is the **DEMOUSD** SAC above. Classic code: `DEMOUSD:GAK7PGZIGH2ASZY6LF762ACROPQGBF7X4ZNUMPIMMOEP5ZFTGWTSA4TY`.
 
 ### Oracle feed IDs
 

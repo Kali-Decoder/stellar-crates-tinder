@@ -20,6 +20,8 @@ Set a budget, swipe assets into a basket, deposit stablecoin on testnet via Frei
 - **Swipe-to-basket** allocation with fixed ticket size and period limits
 - **Non-custodial** invest path: Freighter signs `create_bucket` → USDC approve → `deposit`
 - **Personal vault buckets** — one owner per basket; many baskets per wallet
+- **Rebalance** — one signature moves drifted legs back to target weights against vault pools (±2% drift band, $1 min trade, 1% slippage bound)
+- **Withdraw** — burn shares for the pro-rata slice of every held asset + idle USDC (approve + withdraw signatures)
 - **30 tokenized RWAs** (stocks, ETFs, commodities, FX) + DEMOUSD settlement
 - **Portfolio & PnL** via DIA spots (Mongo-backed when configured)
 - **Activity history** — tagged create / approve / deposit / withdraw / rebalance / close events with explorer links
@@ -97,9 +99,10 @@ PUBLIC_ORIGIN=http://localhost:5173
 2. Set cadence, period limit, ticket size, and asset mix.
 3. Swipe RWAs into a basket.
 4. On Profile / Review, **Get testnet USDC** if the wallet needs DEMOUSD.
-5. **Invest on Stellar** — three signatures: create bucket → approve → deposit.
-6. Portfolio API records the basket and activity events; PnL marks against DIA spots.
-7. **Activity** shows the tagged history with Stellar.expert links.
+5. **Invest on Stellar** — three signatures: create bucket → approve → deposit. The deposit lands as idle DEMOUSD in your bucket.
+6. Open **Portfolio**, expand the basket → **Rebalance** deploys that idle cash into the target weights (one signature). Rerun any time legs drift past ±2% of target.
+7. **Withdraw** a percentage (25 / 50 / 100%) — two signatures: share-burn allowance, then burn shares for the pro-rata asset payout.
+8. Portfolio API records every step; PnL marks against DIA spots; **Activity** shows the tagged history with Stellar.expert links.
 
 In-app guide: **Docs** in the header. Written guide: [`swyft/docs/PRODUCT_GUIDE.md`](swyft/docs/PRODUCT_GUIDE.md).
 
@@ -144,7 +147,7 @@ flowchart TB
   Events --> ActivityUI
 ```
 
-### On-chain invest path
+### On-chain lifecycle
 
 ```text
 create_bucket(name, allocations)
@@ -152,7 +155,18 @@ create_bucket(name, allocations)
 approve(usdc → vault)
 deposit(bucket_id, amount)
   → vault pulls DEMOUSD, mints shares at pre-deposit NAV
+  → funds sit as idle USDC until first rebalance
+rebalance(bucket_id, deadline, slippage_bps, min_outs)
+  → permissionless keeper call; trades drifted legs back to target
+    against vault-owned constant-product pools; min_outs bound every swap
+withdraw(bucket_id, user, shares)
+  → requires a share-token allowance (user approves the vault, then signs withdraw)
+  → burns shares, pays pro-rata slice of all holdings + idle USDC
 ```
+
+Rebalance parameters: drift band ±2% (`drift_bps`), $1 minimum trade, hard slippage ceiling 10% (UI sends 1%), deadline 5 minutes. The UI computes `min_outs` off-chain from DIA spots + live pool reserves.
+
+Withdrawal note: OZ `burn_from` spends an owner→vault allowance on the share token — that's why withdraw is two signatures.
 
 Contract details: [`swyft/docs/CONTRACTS.md`](swyft/docs/CONTRACTS.md).
 
@@ -238,49 +252,48 @@ UI alias: `GOOGL` → on-chain `GOOG`.
 
 | Role | Address |
 |---|---|
-| Admin (`demo-admin`) | `GAJFL4R3GOPEZYRASNWKKU7AGCS2Q4TGV7Q2YAGDIPHPR2ZWVF4C23DX` |
-| DEMOUSD issuer (`demo-usdc-issuer`) | `GDY4CLVS7F5MR2D3ZWAI7SZQAC3ZGIY72FLZ2NC473TDSAJ6NY3TEYSU` |
-| dia-oracle | [`CCLPSSKT…NRF5`](https://stellar.expert/explorer/testnet/contract/CCLPSSKT6R2GYJ2Y55NA6ZM2P6IQB2MO47ZIHBJG5OJIDXSW6BLRNRF5) |
-| DEMOUSD SAC (7 decimals) | [`CBJ5NPXA…KELV`](https://stellar.expert/explorer/testnet/contract/CBJ5NPXATRN4U34AGS3AIDFJLOY4KMXFDM4BJT5WYJ3MRY373DGZKELV) |
-| bucket-vault | [`CDNUYNSI…KVO5`](https://stellar.expert/explorer/testnet/contract/CDNUYNSIEOOJ7IYICJLHPQKLLKAYC62B2XR5C644GLUX3P22D6ZVKVO5) |
-| share-token wasm hash | `4217581895c609e8be2e4789967f7938650763d5b8a0c9f4481fb67bad1ab0ef` |
+| Admin (`demo-admin`) | `GDVJOVCZBKQY5FIDMRFDEVCQ3M6MP2BG4KYPDO6FJ2KUOLQPUWIEIW2M` |
+| DEMOUSD issuer (`demo-usdc-issuer`) | `GAK7PGZIGH2ASZY6LF762ACROPQGBF7X4ZNUMPIMMOEP5ZFTGWTSA4TY` |
+| dia-oracle | [`CDME5DBW…F2T6A`](https://stellar.expert/explorer/testnet/contract/CDME5DBWV5CRHY6WHIN2KPDLMPJVHKH2J3PWY6AFILIC7HRZHAJF2T6A) |
+| DEMOUSD SAC (7 decimals) | [`CDLPZ6OA…CRAA`](https://stellar.expert/explorer/testnet/contract/CDLPZ6OAYSNO4LNXKL3GCLG57KTOQRBXWEE775XO3CUC4Y7GOBV2CRAA) |
+| bucket-vault | [`CDRVFECR…EELKQ`](https://stellar.expert/explorer/testnet/contract/CDRVFECRSEWANIVJJVGGPPAM4VKKDVJLL2NQYRZQNNQN3P27AH4EELKQ) |
+| share-token wasm hash | `62d2e1ad01c76bb7f6ca8c244e0341b9e0f9a11a66482154cad45422caf118d0` |
 
-Classic trustline: `DEMOUSD:GDY4CLVS7F5MR2D3ZWAI7SZQAC3ZGIY72FLZ2NC473TDSAJ6NY3TEYSU`.
+Classic trustline: `DEMOUSD:GAK7PGZIGH2ASZY6LF762ACROPQGBF7X4ZNUMPIMMOEP5ZFTGWTSA4TY`.
 
 ### Asset token contracts (30)
 
 | Symbol | Contract |
-|---|---|
-| AAPL | `CCFYBBF3XIGKIVDT7S7FTBFBRO5M7GZ7ZIRMVH72WEMBUYIGX4YAKE6V` |
-| AMD | `CAU6J5HJ7UOOYU24NP75XFIMG66BAKI7UJG6IP26HMPVTEHWBQTPPVCR` |
-| AMZN | `CB45EFZZNN2B3JCD35DHBAHLWKLQRPMDXUY46QZ562RNU6CA3V25WJ52` |
-| DIS | `CCM4RBKSHKN4QWDV76W7GUYVYZTNPPOCJF755ZTBEMANBYF7EMHF5NUF` |
-| GOOG | `CAYW6YZTYUYQZPOYHWW37JJAWP2ETSQAF6LYJHMXPQLEK34F3OKSATKM` |
-| JNJ | `CDDZIIJUN5QIYX6EM25AXE7GUB3V3HJG42MEXQOMODT6W6U7QRZFYKFQ` |
-| JPM | `CDJ7LCX7KMKL5QY3NPMDM7MKPSW2KKWXSK4NI4KNUHI26GFVEP6MCXSV` |
-| KO | `CDVPSY4R4LZGNURCMAIXW4CNZ3WAA4J6RPDCIBXZR5XX6CWDZN37DAUC` |
-| META | `CCKVKUR5DXFUTAET5IOQTRZWW6ETYFNO27TMHURTGAXKJ7L4UJ5BWLII` |
-| MSFT | `CAOZ5TJTEMTYNWPBNDEPMNYATKFQG56PWXNYD4SACTN2PILMQ62YZT7E` |
-| NFLX | `CAD7M6FVUEB3GKTDIUNS35EQ2PIJIAWRLAIYP7PMWHTEQFELODLGUCKN` |
-| NVDA | `CC7XSYW3O4X6ERQ6EFD3PZ7NSCEFYTYOTPQHOEPY5S6LPFWP2Z5I7UFT` |
-| ORCL | `CD3FBQNBN3BNP6AN3VLB6IAOWZFNS6AI5GFTEVAI5ZQHY2KM6TF3EWAW` |
-| PG | `CA6THUOBFR6J7PGHFWCFKGJ26XTI42ACG2ZHJG4CF5XQOEVVYKDPGKZR` |
-| TSLA | `CCCWBXCHOQHK5TAAMAKZZYL36NSXXP5CDTRY534GECZ6W5243RBWKVKN` |
-| V | `CAIGVSUCMRJXOJXLXWJ7LKOA7MBREBWM7YKNMTXAREDAIFDYO5WUHPVU` |
-| WMT | `CBK456SIHMCME2AIJQF74WKVFYYIURWTYG27M4GNWJALCM3YOAL5HQSX` |
-| XOM | `CD47HDOU2TYYMDKGIZT7CB5DDUQGKYQAMTVHX5S2I6MGX2NFJZ272KQL` |
-| IBIT | `CA7JPBHKM2WIHB5VW4G66CP65WXWAYYVR7JCTCEYL6ZJHBXQG6QYRAAI` |
-| IVV | `CAT4FOF7U5PR5S47JP2PMHR3OK3SZVZR75YSH6NCCGZ6NS7ERKOUWP6P` |
-| QQQ | `CD452FHCW7J6HIQM6NRUPNNMKP466W2C37SJDEXZVX3TRPE5FEY67CY3` |
-| SPY | `CCLNACNASCKOTUWMODJI7PZHL7N5B6EWFUD5JAU7ZBHXJ6OXYLEQCOTX` |
-| TLT | `CCGOB5XCFRY42Y6VJL23QXV7GZKMYICSJIMQTUM7PC36UNAXDPNZOQJY` |
-| VOO | `CAAUI3BLHKQTFOAISWVDS4XDH4AAQICU4CFOGVIZ2NNAMXSPMONLRR5B` |
-| NG | `CB52CF4JTZHNV2A76R3Y3MAJYPUQCEPALCJWNBT2OUXTHJO2FI3T2QHR` |
-| WTI | `CAP45F3NIX76KCABVZWM3OTTMISZIYVVETEVCPQTGXGBDWH2HS2V5S5R` |
-| XAGG | `CARXGD3APQ4HV7EJ43LKJOPYPWI4KI4Q5UTKBM4Z5PFY6R4CZX27BGB4` |
-| XAU | `CBID5UQVJHNOD7RWL6XFZKVY72IUEC4NJBNGIEVPPNXVN57YDLSCOHJT` |
-| EUR | `CAGGFGAXHLRNXJQFE2QYB23RMLSJC7Z35FJD2IMA2OGN7NIA3PYMPPCO` |
-| JPY | `CCI5IBAHBYCGMZZPCX7NRTBJPYVE7QHJC7FTL2G6XOV5R4Q53XHJDQBJ` |
+| AAPL | `CDUFA63JRHVMHOBEPSZQKE5T36CUEP5QG4J6CHKFUZGZELJFNFUVFXYI` |
+| AMD | `CBHU7WF3PWM3EHFMKVPRVKGDNYBETT6I7HYU44VFKX3K7INVXMQQGEP6` |
+| AMZN | `CD3N25FENUSLJGT2IW6ZGQSVR4XI4XJOWWDSY6SNXWHZB3GAQHOCP4G2` |
+| DIS | `CDKJKZMB5DIU3ZUTOIOOYK3J22OIYSISXGOUMAFYMGT757KHMOCD6Q3N` |
+| GOOG | `CDNACMQBEMUQ64YORZMKBEX6L6Z72AT4AW5KWAGXXF4RKOHSK4UZUMUC` |
+| JNJ | `CCJCPKLIVEGJPQAG2QFCL4X43THNU35WTYVELISC2MBA773WFBYKXKO4` |
+| JPM | `CCWHKPDGTMSY73TEWJ4WLQ3H2X6OXMRG3UOQOGRWZU2JXU22L6LSHPKL` |
+| KO | `CDCYRWYP4SVF4TCSI3IMRXHQA7SG5IS2OT4JFIHB77S3YYABZINUKM54` |
+| META | `CDW5HHETN4KWESC3SHY3723H5MAJLBMBG6VUOEQ7LO6ZNJI6HOMR22J5` |
+| MSFT | `CCFRV722CSIRN3DKMDV7TEMGMZXOB5H3BHWCCUZ3O3KRO5MYTD444AAC` |
+| NFLX | `CCU5LWUSIOCV7B7FRGMF27LBQSPVM7PPVK3RXHK5CKF6KTX2IZZUVZQ4` |
+| NVDA | `CC6SWZYSTSVKGYS3765C4M72ZHEUF7CE6JLHSNT3CO6ABV2XXG4DJNWW` |
+| ORCL | `CBZOG7SEE3YGHJGS4QP463QZ3DOVOMFFDP55XWSWC6UEOXFRYLQ2V263` |
+| PG | `CBB5MU7OPER2YRTEC2OJPRBTMK6EMOHXP5YPLPIESFUJYQW45MVD5P7I` |
+| TSLA | `CBJFFJHS5VKEAB4YM4XUPE2V7PNWUOW2VMYSMGR2PC6JFKWQ37RTWSAC` |
+| V | `CCGMLF2XBRNCZGXN573JC7WXIF2OMRYKOM57GPNCDW2EB3BU6XLN7V5L` |
+| WMT | `CDZPWGU2IQRGTWXOFO6MRTBS37KSTL4ELQBTDK3W47HEJLVRKRAPCJBG` |
+| XOM | `CBISP2WLZS3SJDXPLGH4CBK5LZ6WZLKB64KKYHQVYO4QZKOYVWPAS4BI` |
+| IBIT | `CBZIOQGTYQCLM7FNMBLQTSQQBIS5PADYROBOWDLXQW2GW4BGYTE5GJPQ` |
+| IVV | `CDGH7U6PB5E632ULAGVWN2WKKDFMOHCZEV3Q6LREKODN26NAJBDU3QEF` |
+| QQQ | `CDJMORZ2V62CJZ76NGAJSKFOGQTUSBLI6F4AI3PHM4Y66BUESHZJDEQM` |
+| SPY | `CB6TKC3727CVDELEFNJBGQAT7GBKJPUYBTHJO7TKEXAXOKOMO6XTDZUR` |
+| TLT | `CASYL5HOPBXQNB5QYQ76ET7GOR55ZZ3LRAD3FMIMCVJN5XBLERO3NGZY` |
+| VOO | `CCA4NDSXHA3XIFQK4U3ZZ6A55TV2CPRQ7OZ2RIXHPJU3VHQZY7ODQ3W7` |
+| NG | `CCGTJTXPBIHI7BHW6TXOUD32AYL6VPOANDXUUDGWM4Z2GK7DJLXRGJWA` |
+| WTI | `CC34QUVU2WXYEL33BWUPRIEWDPWMXEYXMG6CA26OISEPA64VPHK5GFDS` |
+| XAGG | `CA33DXW4VA2W2KJZMFPSDEUC4S3SS2GFOYI24KL64R5RVSCBEI7O6J7U` |
+| XAU | `CBBMQ6O4IZYZ6IL7VTF2HQY6NC55YFLT4HKM6TRL7AQQDTBE4DUKHDTJ` |
+| EUR | `CA2WWEAPNHXY4P52I7C4R2YTBY5LE3KWYHDK66YFODB5FCCKAGIGIPDR` |
+| JPY | `CD6U4JNQERR74ZF3S7TGQCGZXQOO3NP2XEJFHBWO7RGQD5GCPTIWPWOV` |
 
 Oracle feed keys are `SYMBOL/USD` (plus `USDC/USD` for settlement). Keep them fresh:
 
@@ -292,12 +305,40 @@ node scripts/update-oracle-feeds.mjs --watch
 
 ### Redeploy contracts
 
+Idempotent — reruns fill in only the missing steps (state: `swyft/scripts/.stellar-deploy.json`):
+
 ```bash
 cd swyft
 npm run build:contracts
-node scripts/deploy-stellar.mjs
-# sync addresses into src/client/stellar/deploy.json
+node scripts/deploy-stellar.mjs        # writes deploy.json automatically
+node scripts/update-oracle-feeds.mjs --watch   # keep feeds fresh (separate terminal)
 ```
+
+The deploy script generates + friendbot-funds the `demo-admin` / `demo-usdc-issuer` CLI identities if missing. Both are required locally for the faucet (`stellar keys ls` should list them).
+
+### Full reset (fresh deployment, e.g. identities lost)
+
+```bash
+cd swyft
+mv scripts/.stellar-deploy.json scripts/.stellar-deploy.json.bak   # old state pins old addresses
+rm src/client/stellar/deploy.json                                  # regenerated by deploy script
+npm run build:contracts
+node scripts/deploy-stellar.mjs                                    # ~10 min: keys, oracle, 105 feeds, USDC, vault, 30 tokens, pools, buckets
+```
+
+Wallets with trustlines to a previous DEMOUSD issuer must re-add the trustline for the new issuer (the UI prompts via Freighter on faucet use).
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017` | Mongo not running but `MONGODB_URI` set | Start MongoDB, or comment out `MONGODB_URI` in `server/.env` → in-memory store (data lost on restart) |
+| `Failed to find config identity for demo-usdc-issuer` | Stellar CLI identities missing on this machine | Run the deploy (auto-creates them), or full reset above |
+| Faucet mints but balance doesn't show | Trustline points at an old DEMOUSD issuer | Sign the new change-trust prompt in Freighter (UI offers it), then retry |
+| Rebalance does nothing | All legs within ±2% drift band or trades under $1 | Expected no-op; drift appears as prices move |
+| Withdraw simulation fails with contract error #101 | Share-burn allowance missing/expired | Retry — the UI re-approves before every withdraw |
 
 ---
 
