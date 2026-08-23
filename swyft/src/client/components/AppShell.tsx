@@ -37,6 +37,8 @@ interface Props {
 	navigationEnabled?: boolean;
 	/** Skip Privy wallet menu; show Stellar / preview address controls. */
 	mockMode?: boolean;
+	/** Local app username created when the wallet connects. */
+	username?: string;
 	activeChain: "ROBINHOOD" | "SOLANA";
 	onChainChange: (chain: "ROBINHOOD" | "SOLANA") => void;
 	solanaWallets: ShellSolanaWallet[];
@@ -59,6 +61,7 @@ export function AppShell({
 	walletConnecting = false,
 	navigationEnabled = true,
 	mockMode = false,
+	username,
 	activeChain,
 	onChainChange,
 	solanaWallets,
@@ -113,7 +116,7 @@ export function AppShell({
 							["week", "Basket"],
 							["positions", "Portfolio"],
 							["receipts", "Activity"],
-							["account", "Account"],
+							["account", "Profile"],
 							["docs", "Docs"],
 						].map(([id, label]) => (
 							<button
@@ -134,6 +137,7 @@ export function AppShell({
 							{mockMode ? (
 								<StellarConnectedPill
 									address={wallet}
+									username={username}
 									onDisconnect={onDisconnect}
 								/>
 							) : (
@@ -184,9 +188,11 @@ export function AppShell({
 
 function StellarConnectedPill({
 	address,
+	username,
 	onDisconnect,
 }: {
 	address: string;
+	username?: string;
 	onDisconnect?: () => void;
 }) {
 	const [open, setOpen] = useState(false);
@@ -211,13 +217,25 @@ function StellarConnectedPill({
 				onClick={() => setOpen((value) => !value)}
 			>
 				<Wallet size={17} strokeWidth={1.7} />
-				{shortStellarAddress(address)}
+				<span className="wallet-pill-label">
+					{username ? (
+						<>
+							<span className="wallet-pill-username">@{username}</span>
+							<span className="wallet-pill-address">
+								{shortStellarAddress(address)}
+							</span>
+						</>
+					) : (
+						shortStellarAddress(address)
+					)}
+				</span>
 			</button>
 			{open ? (
 				<div className="wallet-menu-content" role="menu">
 					<div className="wallet-menu-heading">
-						<span>Stellar wallet</span>
-						<strong>{shortStellarAddress(address)}</strong>
+						<span>{username ? "Signed in as" : "Stellar wallet"}</span>
+						{username ? <strong>@{username}</strong> : null}
+						<small>{shortStellarAddress(address)}</small>
 					</div>
 					{onDisconnect ? (
 						<button

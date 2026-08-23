@@ -9,6 +9,7 @@ import {
 import { defineChain } from "viem";
 import { App } from "./App";
 import { api, type PublicConfig } from "./api";
+import { LicenseGate } from "./components/LicenseModal";
 
 const robinhoodChain = defineChain({
 	id: 4663,
@@ -106,7 +107,9 @@ export function LiveRoot() {
 			}}
 		>
 			<SmartWalletsProvider>
-				<App config={config} />
+				<LicenseGate>
+					<App config={config} />
+				</LicenseGate>
 			</SmartWalletsProvider>
 		</PrivyProvider>
 	);

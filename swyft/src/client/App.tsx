@@ -41,11 +41,12 @@ import { ReceiptScreen } from "./components/ReceiptScreen";
 import { DocsScreen } from "./components/DocsScreen";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { SwipeCard } from "./components/SwipeCard";
-import { SwipeGestures } from "./components/SwipeGestures";
+import { playSwipeSound, unlockSwipeAudio } from "./swipe-sounds";
 import {
 	removeLegacyPreferences,
 	writeAccountPreferences,
 } from "./preferences-storage";
+import { ensureUserForWallet } from "./user-storage";
 
 type View = "week" | "positions" | "receipts" | "account" | "docs";
 type Stage = "loading" | "onboarding" | "swipe" | "review";
@@ -307,6 +308,11 @@ export function App({ config }: { config: PublicConfig }) {
 	}, [authenticated, preferences, user?.id]);
 
 	useEffect(() => {
+		if (!authenticated || !displayWallet) return;
+		ensureUserForWallet(displayWallet);
+	}, [authenticated, displayWallet]);
+
+	useEffect(() => {
 		if (!privyReady || authenticated) return;
 		setView("week");
 		setStage("onboarding");
@@ -465,6 +471,8 @@ export function App({ config }: { config: PublicConfig }) {
 
 	function animateDecision(add: boolean) {
 		if (!current || decisionFeedback || (add && !canAddCurrent)) return;
+		unlockSwipeAudio();
+		playSwipeSound(add ? "add" : "skip");
 		setDecisionFeedback(add ? "invest" : "skip");
 		decisionTimer.current = window.setTimeout(() => {
 			decide(add);
@@ -768,13 +776,7 @@ export function App({ config }: { config: PublicConfig }) {
 											infoOpen={assetInfoOpen}
 											onInfoOpenChange={setAssetInfoOpen}
 											onSwipe={animateDecision}
-										/>
-										<SwipeGestures
-											onSkip={() => animateDecision(false)}
-											onAdd={() => animateDecision(true)}
-											addLabel={`Add ${ticketSizeUsd} ${stableToken}`}
-											disabled={Boolean(decisionFeedback)}
-											addDisabled={!canAddCurrent}
+											canAdd={canAddCurrent}
 										/>
 									</div>
 									{currentWarnings.length ? (

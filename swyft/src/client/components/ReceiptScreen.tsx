@@ -34,25 +34,40 @@ export function ReceiptScreen({
 	onStartNextBasket: () => void;
 }) {
 	const showConfetti = useSettlementConfetti(record);
+	const [expandedId, setExpandedId] = useState<string | null>(null);
+	const [detailsOpen, setDetailsOpen] = useState(false);
+
+	useEffect(() => {
+		setExpandedId(selected[0]?.assetId ?? null);
+	}, [record?.plan.executionId, selected]);
 
 	if (!record) {
 		return (
-			<main className="empty-page">
-				<h1>Activity</h1>
-				<p>
-					Your terminal settlement receipts will appear here. A quote or
-					transaction hash alone is never shown as settled.
-				</p>
-				<button
-					type="button"
-					className="button button-primary"
-					onClick={onStartNextBasket}
-				>
-					New basket
-				</button>
+			<main className="receipt-page activity-page">
+				<header className="receipt-heading activity-heading">
+					<div>
+						<span className="eyebrow">Activity</span>
+						<h1>No settlements yet</h1>
+						<p>
+							Terminal receipts appear here after you invest in a basket.
+							Quotes alone never count as settled.
+						</p>
+					</div>
+				</header>
+				<section className="activity-empty-card">
+					<p>Build a basket, then settle from Review to see activity here.</p>
+					<button
+						type="button"
+						className="button button-primary"
+						onClick={onStartNextBasket}
+					>
+						New basket
+					</button>
+				</section>
 			</main>
 		);
 	}
+
 	const isTerminal = ["SETTLED", "PARTIAL", "FAILED"].includes(record.status);
 	const successfulLegs = record.settledOutputs.filter(
 		(output) => output.status === "success",
@@ -71,7 +86,6 @@ export function ReceiptScreen({
 		record.status,
 		selected.length,
 		successfulLegs,
-		demoMode,
 		chainLabel,
 		providerLabel,
 		record.submissionMode,
@@ -87,14 +101,8 @@ export function ReceiptScreen({
 	const totalInput = formatUsd(
 		formatUnits(BigInt(record.plan.totalInputBaseUnits), 6),
 	);
-	const settledDescription = demoMode
-		? `${totalInput} was split across ${selected.length} demo assets. No transaction was broadcast.`
-		: `${totalInput} was split across ${successfulLegs} ${successfulLegs === 1 ? "asset" : "assets"} and added to your portfolio.`;
-	const receiptTitle = isSettled
-		? demoMode
-			? "Demo basket complete"
-			: "Basket settled"
-		: receiptStatus.title;
+	const settledDescription = `${totalInput} was split across ${successfulLegs} ${successfulLegs === 1 ? "asset" : "assets"} and added to your portfolio.`;
+	const receiptTitle = isSettled ? "Basket settled" : receiptStatus.title;
 	const receiptDescription = isSettled
 		? settledDescription
 		: receiptStatus.description;
@@ -103,7 +111,7 @@ export function ReceiptScreen({
 		: undefined;
 
 	return (
-		<main className="receipt-page">
+		<main className="receipt-page activity-page">
 			{showConfetti ? (
 				<Confetti
 					className="receipt-confetti"
@@ -116,7 +124,8 @@ export function ReceiptScreen({
 					}}
 				/>
 			) : null}
-			<header className="receipt-heading" aria-live="polite">
+
+			<header className="receipt-heading activity-heading" aria-live="polite">
 				<span
 					className={`receipt-check ${isPending ? "pending" : record.status === "FAILED" ? "failed" : ""}`}
 				>
@@ -129,77 +138,46 @@ export function ReceiptScreen({
 					)}
 				</span>
 				<div>
+					<span className="eyebrow">Activity</span>
 					<h1>{receiptTitle}</h1>
 					<p>{receiptDescription}</p>
 				</div>
 			</header>
-			<section className="receipt-ledger">
-				<h2>What you bought</h2>
-				{selected.map((candidate) => {
-					const output = outputsByAssetId.get(candidate.assetId);
-					const isSuccess = output?.status === "success";
-					const quote =
-						candidate.quote ??
-						record.plan.quotes.find(
-							(candidateQuote) => candidateQuote.assetId === candidate.assetId,
-						);
-					const fullOutput =
-						isSuccess && output
-							? formatUnits(
-									BigInt(output.amountOutBaseUnits),
-									candidate.decimals,
-								)
-							: undefined;
-					return (
-						<div className="receipt-row" key={candidate.assetId}>
-							<AssetMark
-								symbol={candidate.symbol}
-								iconUrl={candidate.iconUrl}
-								size="sm"
-							/>
-							<div className="receipt-asset">
-								<b>{candidate.symbol}</b>
-								<small>
-									{quote ? (
-										`${formatUsd(formatUnits(BigInt(quote.amountInBaseUnits), 6))} allocation`
-									) : (
-										<>
-											Allocation unavailable ·{" "}
-											<StableTokenLabel token={stableToken} />
-										</>
-									)}
-								</small>
-							</div>
-							<div
-								className={
-									isSuccess
-										? "receipt-output status-complete"
-										: output?.status === "failed"
-											? "receipt-output status-failed"
-											: "receipt-output status-pending"
-								}
-								title={
-									fullOutput ? `${fullOutput} ${candidate.symbol}` : undefined
-								}
-							>
-								{isSuccess && output && fullOutput ? (
-									<>
-										<span>
-											{formatTokenAmount(fullOutput)} {candidate.symbol}
-										</span>
-										<small>received</small>
-									</>
-								) : output?.status === "failed" ? (
-									<span>Not settled</span>
-								) : isTerminal ? (
-									<span>No output recorded</span>
-								) : (
-									<span>Awaiting receipt</span>
-								)}
-							</div>
-						</div>
-					);
-				})}
+
+			<section className="activity-summary" aria-label="Settlement summary">
+				<div className="activity-stat">
+					<small>Spent</small>
+					<strong>
+						{totalInput} <StableTokenLabel token={stableToken} />
+					</strong>
+				</div>
+				<div className="activity-stat">
+					<small>Assets</small>
+					<strong>{selected.length || record.plan.quotes.length}</strong>
+				</div>
+				<div className="activity-stat">
+					<small>Status</small>
+					<strong
+						className={
+							isSettled ? "pnl-up" : record.status === "FAILED" ? "pnl-down" : ""
+						}
+					>
+						{record.status}
+					</strong>
+				</div>
+				<div className="activity-stat">
+					<small>Network</small>
+					<strong>{chainLabel}</strong>
+				</div>
+			</section>
+
+			<section className="activity-ledger">
+				<div className="activity-ledger-head">
+					<h2>What you bought</h2>
+					<span className="activity-tag">{providerLabel}</span>
+					<span className="activity-tag">{chainLabel}</span>
+				</div>
+
 				{!selected.length ? (
 					<p className="receipt-missing-snapshot">
 						The operation is preserved, but its local card snapshot is
@@ -207,15 +185,131 @@ export function ReceiptScreen({
 						details.
 					</p>
 				) : null}
+
+				<div className="activity-asset-list" role="list">
+					{selected.map((candidate) => {
+						const output = outputsByAssetId.get(candidate.assetId);
+						const isSuccess = output?.status === "success";
+						const quote =
+							candidate.quote ??
+							record.plan.quotes.find(
+								(candidateQuote) =>
+									candidateQuote.assetId === candidate.assetId,
+							);
+						const fullOutput =
+							isSuccess && output
+								? formatUnits(
+										BigInt(output.amountOutBaseUnits),
+										candidate.decimals,
+									)
+								: undefined;
+						const open = expandedId === candidate.assetId;
+						const statusLabel = isSuccess
+							? "Received"
+							: output?.status === "failed"
+								? "Failed"
+								: isTerminal
+									? "Missing"
+									: "Pending";
+
+						return (
+							<article
+								key={candidate.assetId}
+								className={`activity-asset-card${open ? " is-open" : ""}`}
+								role="listitem"
+							>
+								<button
+									type="button"
+									className="activity-asset-toggle"
+									aria-expanded={open}
+									onClick={() =>
+										setExpandedId((current) =>
+											current === candidate.assetId ? null : candidate.assetId,
+										)
+									}
+								>
+									<div className="activity-asset-main">
+										<AssetMark
+											symbol={candidate.symbol}
+											iconUrl={candidate.iconUrl}
+											size="md"
+										/>
+										<div>
+											<strong>{candidate.symbol}</strong>
+											<small>{candidate.name}</small>
+										</div>
+									</div>
+									<div className="activity-asset-side">
+										<span
+											className={`activity-status-tag status-${statusLabel.toLowerCase()}`}
+										>
+											{statusLabel}
+										</span>
+										{quote ? (
+											<span className="activity-amount-tag">
+												{formatUsd(
+													formatUnits(BigInt(quote.amountInBaseUnits), 6),
+												)}
+											</span>
+										) : null}
+										<ChevronDown
+											className="activity-chevron"
+											size={18}
+											strokeWidth={2.4}
+											aria-hidden="true"
+										/>
+									</div>
+								</button>
+
+								{open ? (
+									<div className="activity-asset-detail">
+										<div className="activity-detail-row">
+											<span>Allocation</span>
+											<strong>
+												{quote
+													? formatUsd(
+															formatUnits(BigInt(quote.amountInBaseUnits), 6),
+														)
+													: "—"}{" "}
+												<StableTokenLabel token={stableToken} />
+											</strong>
+										</div>
+										<div className="activity-detail-row">
+											<span>Received</span>
+											<strong>
+												{fullOutput
+													? `${formatTokenAmount(fullOutput)} ${candidate.symbol}`
+													: "—"}
+											</strong>
+										</div>
+										{quote?.unitPriceUsd ? (
+											<div className="activity-detail-row">
+												<span>Unit price</span>
+												<strong>
+													{formatUsd(String(quote.unitPriceUsd))}
+												</strong>
+											</div>
+										) : null}
+										{output?.transactionHash ? (
+											<div className="activity-detail-row">
+												<span>Tx</span>
+												<code>{shortHash(output.transactionHash)}</code>
+											</div>
+										) : null}
+									</div>
+								) : null}
+							</article>
+						);
+					})}
+				</div>
+
 				<div
 					className={`receipt-verification ${isPending ? "pending" : record.status === "FAILED" ? "failed" : ""}`}
 				>
 					{isPending ? <LoaderCircle /> : <Check />}
 					<b>
 						{isSettled
-							? demoMode
-								? "Verified local simulation"
-								: `Verified on ${chainLabel}`
+							? `Verified on ${chainLabel}`
 							: `${record.status.toLowerCase()} on ${chainLabel}`}
 					</b>
 				</div>
@@ -225,23 +319,29 @@ export function ReceiptScreen({
 					</p>
 				) : null}
 			</section>
-			<section className="receipt-technical">
-				<details className="receipt-execution-details">
-					<summary>
-						<span className="receipt-detail-icon">
-							<SlidersHorizontal aria-hidden="true" />
-						</span>
-						<span>
-							<b>How this was executed</b>
-							<small>
-								{demoMode
-									? `${record.plan.quotes.length} simulated swaps`
-									: `One ${providerLabel} transaction · ${record.plan.quotes.length} swaps`}
-							</small>
-						</span>
-						<ChevronDown aria-hidden="true" />
-					</summary>
-					<div className="receipt-proof">
+
+			<section className="activity-technical">
+				<button
+					type="button"
+					className={`activity-tech-toggle${detailsOpen ? " is-open" : ""}`}
+					aria-expanded={detailsOpen}
+					onClick={() => setDetailsOpen((value) => !value)}
+				>
+					<span className="receipt-detail-icon">
+						<SlidersHorizontal aria-hidden="true" />
+					</span>
+					<span>
+						<b>How this was executed</b>
+						<small>
+							One {providerLabel} transaction · {record.plan.quotes.length}{" "}
+							swaps
+						</small>
+					</span>
+					<ChevronDown aria-hidden="true" />
+				</button>
+
+				{detailsOpen ? (
+					<div className="receipt-proof activity-proof">
 						<p>
 							<Shield />
 							<span>
@@ -264,7 +364,7 @@ export function ReceiptScreen({
 						<p>
 							<Shield />
 							<span>
-								{demoMode ? "Ranking output" : "0G output"}
+								Ranking output
 								<b>
 									{feed
 										? shortHash(feed.proof.outputCommitment)
@@ -272,7 +372,7 @@ export function ReceiptScreen({
 								</b>
 							</span>
 						</p>
-						{!demoMode && feed?.proof.teeVerified ? (
+						{feed?.proof.teeVerified ? (
 							<div className="receipt-proof-links">
 								<a
 									href={zeroGProviderUrl(feed.proof.provider)}
@@ -290,16 +390,15 @@ export function ReceiptScreen({
 								</a>
 							</div>
 						) : null}
-						<div className={demoMode ? "demo-disclosure" : "live-disclosure"}>
-							{demoMode
-								? "This receipt is local demo evidence. It is not mainnet settlement proof."
-								: record.submissionMode === "BATCH"
-									? `Live settlement is verified from the atomic ${chainLabel} operation and output-token transfers to your Swyft Wallet.`
-									: `Live settlement is verified per ${chainLabel} transaction and output-token transfer to your Swyft Wallet.`}
+						<div className="live-disclosure">
+							{record.submissionMode === "BATCH"
+								? `Settlement is verified from the atomic ${chainLabel} operation and output-token transfers to your Swyft Wallet.`
+								: `Settlement is verified per ${chainLabel} transaction and output-token transfer to your Swyft Wallet.`}
 						</div>
 					</div>
-				</details>
-				<div className="receipt-transaction-row">
+				) : null}
+
+				<div className="receipt-transaction-row activity-tx-row">
 					<span className="receipt-detail-icon">
 						<FileText aria-hidden="true" />
 					</span>
@@ -311,7 +410,7 @@ export function ReceiptScreen({
 								: "Awaiting operation hash"}
 						</small>
 					</span>
-					{transactionUrl && !demoMode ? (
+					{transactionUrl ? (
 						<a
 							href={transactionUrl}
 							target="_blank"
@@ -320,9 +419,12 @@ export function ReceiptScreen({
 						>
 							<ExternalLink aria-hidden="true" />
 						</a>
-					) : null}
+					) : (
+						<span className="activity-tag">{chainLabel}</span>
+					)}
 				</div>
 			</section>
+
 			<div className="receipt-actions">
 				{isPending ? (
 					<button
@@ -397,95 +499,80 @@ function formatUsd(value: string) {
 }
 
 function formatTokenAmount(value: string) {
-	const [whole, fraction = ""] = value.split(".");
-	if (!fraction) return whole;
-	if (whole !== "0") {
-		const compact = fraction.slice(0, 6).replace(/0+$/, "");
-		return compact ? `${whole}.${compact}` : whole;
-	}
-	const firstNonZero = fraction.search(/[1-9]/);
-	if (firstNonZero === -1) return "0";
-	const compact = fraction
-		.slice(0, Math.min(fraction.length, firstNonZero + 5))
-		.replace(/0+$/, "");
-	return `0.${compact}`;
+	const amount = Number(value);
+	if (!Number.isFinite(amount)) return value;
+	if (amount >= 1000) return amount.toFixed(2);
+	if (amount >= 1) return amount.toFixed(4);
+	return amount.toPrecision(4);
 }
 
-function formatSettledAt(value: string) {
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) return value;
-	return new Intl.DateTimeFormat("en-US", {
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-		hour: "numeric",
-		minute: "2-digit",
-		timeZoneName: "short",
-	}).format(date);
+function shortHash(value: string) {
+	if (value.length <= 14) return value;
+	return `${value.slice(0, 8)}…${value.slice(-6)}`;
+}
+
+function formatSettledAt(iso: string) {
+	try {
+		return new Intl.DateTimeFormat("en-US", {
+			dateStyle: "medium",
+			timeStyle: "short",
+		}).format(new Date(iso));
+	} catch {
+		return iso;
+	}
+}
+
+function explorerUrl(hash: string, chain: ExecutionRecord["plan"]["chain"]) {
+	if (/^[a-fA-F0-9]{64}$/.test(hash)) {
+		return `https://stellar.expert/explorer/testnet/tx/${hash}`;
+	}
+	if (chain === "SOLANA") {
+		return `https://solscan.io/tx/${hash}`;
+	}
+	return `https://explorer.robinhood.com/tx/${hash}`;
+}
+
+function zeroGProviderUrl(provider: string) {
+	return `https://explorer.0g.ai/address/${provider}`;
 }
 
 function receiptCopy(
 	status: ExecutionRecord["status"],
-	totalLegs: number,
+	selectedCount: number,
 	successfulLegs: number,
-	demoMode: boolean,
 	chainLabel: string,
 	providerLabel: string,
 	submissionMode: ExecutionRecord["submissionMode"],
 ) {
-	if (status === "SUBMITTED") {
-		return {
-			title: "Basket submitted",
-			description:
-				submissionMode === "BATCH"
-					? `Your Swyft Wallet broadcast one atomic operation. Waiting for ${chainLabel} settlement.`
-					: `Your Swyft Wallet broadcast independent swaps. Waiting for ${chainLabel} settlement.`,
-		};
-	}
 	if (status === "SETTLED") {
-		return demoMode
-			? {
-					title: "Demo complete",
-					description: `All ${totalLegs} legs completed in local demo mode. No transaction was broadcast.`,
-				}
-			: {
-					title: "Basket settled",
-					description: `All ${totalLegs} legs reached a verified terminal state on ${chainLabel}.`,
-				};
+		return {
+			title: "Basket settled",
+			description: `Settled on ${chainLabel} via ${providerLabel}.`,
+		};
 	}
 	if (status === "PARTIAL") {
 		return {
-			title: "Basket partially settled",
-			description: `${successfulLegs} of ${totalLegs} legs reached a verified terminal state. Review the receipt before trying again.`,
+			title: "Partially settled",
+			description: `${successfulLegs} of ${selectedCount} legs settled.`,
 		};
 	}
 	if (status === "FAILED") {
 		return {
-			title: "Basket not settled",
+			title: "Settlement failed",
+			description: "Nothing was added to your portfolio from this attempt.",
+		};
+	}
+	if (status === "SUBMITTED") {
+		return {
+			title: "Waiting on chain",
 			description:
-				"No output-token transfer was verified for this basket. Your wallet remains the source of truth.",
+				submissionMode === "BATCH"
+					? "Your batch transaction is still confirming."
+					: "Your transactions are still confirming.",
 		};
 	}
 	return {
-		title: "Basket prepared",
-		description: `Fresh ${providerLabel} calls are ready for your wallet confirmation.`,
+		title: "Preparing settlement",
+		description: "Quotes are ready. Confirm when you are ready to invest.",
 	};
-}
-
-function explorerUrl(hash: string, chain: ExecutionRecord["plan"]["chain"]) {
-	// Stellar tx hashes are 64 hex chars; prefer Stellar Expert for those.
-	if (/^[a-fA-F0-9]{64}$/.test(hash)) {
-		return `https://stellar.expert/explorer/testnet/tx/${hash}`;
-	}
-	return chain === "SOLANA"
-		? `https://explorer.solana.com/tx/${hash}`
-		: `https://robinhoodchain.blockscout.com/tx/${hash}`;
-}
-
-function zeroGProviderUrl(provider: string) {
-	return `https://explorer.0g.ai/mainnet/blockchain/accounts/${encodeURIComponent(provider)}`;
-}
-
-function shortHash(hash: string) {
-	return hash.length > 20 ? `${hash.slice(0, 12)}…${hash.slice(-6)}` : hash;
 }

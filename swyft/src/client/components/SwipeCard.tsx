@@ -1,4 +1,4 @@
-import { CircleHelp } from "lucide-react";
+import { CircleHelp, Heart, X } from "lucide-react";
 import {
 	useEffect,
 	useId,
@@ -39,6 +39,7 @@ import {
 } from "../stellar/dia-api";
 import { AssetMark } from "./AssetMark";
 import { StableTokenLabel } from "./StableTokenLabel";
+import { unlockSwipeAudio } from "../swipe-sounds";
 
 const SWIPE_THRESHOLD_PX = 72;
 const LOADING_DOTS = Array.from({ length: 32 }, (_, index) => index);
@@ -732,6 +733,7 @@ export function SwipeCard({
 	infoOpen,
 	onInfoOpenChange,
 	onSwipe,
+	canAdd = true,
 }: {
 	candidate: Candidate;
 	reason: string;
@@ -741,9 +743,11 @@ export function SwipeCard({
 	infoOpen: boolean;
 	onInfoOpenChange: (open: boolean) => void;
 	onSwipe: (add: boolean) => void;
+	canAdd?: boolean;
 }) {
 	const pointerStart = useRef<{ id: number; x: number } | undefined>(undefined);
 	const [dragX, setDragX] = useState(0);
+	const busy = Boolean(feedback);
 
 	function resetDrag() {
 		pointerStart.current = undefined;
@@ -752,11 +756,12 @@ export function SwipeCard({
 
 	return (
 		<article
-			className={`swipe-card${dragX ? " is-dragging" : ""}${feedback ? ` is-${feedback}` : ""}`}
+			className={`swipe-card${dragX ? " is-dragging" : ""}${feedback ? ` is-${feedback}` : ""}${dragX < -24 ? " is-lean-skip" : ""}${dragX > 24 ? " is-lean-add" : ""}`}
 			style={{ transform: `translateX(${dragX}px) rotate(${dragX / 28}deg)` }}
 			onPointerDown={(event) => {
 				if (feedback || (event.target as HTMLElement).closest("button, a"))
 					return;
+				unlockSwipeAudio();
 				pointerStart.current = { id: event.pointerId, x: event.clientX };
 				event.currentTarget.setPointerCapture(event.pointerId);
 			}}
@@ -767,7 +772,7 @@ export function SwipeCard({
 				)
 					return;
 				setDragX(
-					Math.max(-120, Math.min(120, event.clientX - pointerStart.current.x)),
+					Math.max(-140, Math.min(140, event.clientX - pointerStart.current.x)),
 				);
 			}}
 			onPointerUp={(event) => {
@@ -778,7 +783,10 @@ export function SwipeCard({
 					return;
 				const distance = event.clientX - pointerStart.current.x;
 				resetDrag();
-				if (Math.abs(distance) >= SWIPE_THRESHOLD_PX) onSwipe(distance > 0);
+				if (Math.abs(distance) >= SWIPE_THRESHOLD_PX) {
+					if (distance > 0 && !canAdd) return;
+					onSwipe(distance > 0);
+				}
 			}}
 			onPointerCancel={resetDrag}
 		>
@@ -793,6 +801,41 @@ export function SwipeCard({
 					<b>{feedback === "invest" ? "In your basket" : "Skipped"}</b>
 				</div>
 			) : null}
+
+			<div className="card-hover-actions" aria-hidden={busy}>
+				<button
+					type="button"
+					className="card-hover-reject"
+					onClick={() => onSwipe(false)}
+					disabled={busy}
+					aria-label="Reject asset"
+				>
+					<X size={32} strokeWidth={2.6} aria-hidden="true" />
+				</button>
+				<button
+					type="button"
+					className="card-hover-accept"
+					onClick={() => onSwipe(true)}
+					disabled={busy || !canAdd}
+					aria-label="Add asset"
+				>
+					<Heart size={30} strokeWidth={2.4} fill="currentColor" aria-hidden="true" />
+				</button>
+			</div>
+
+			<div
+				className={`card-stamp card-stamp-nope${dragX < -24 ? " is-visible" : ""}`}
+				aria-hidden="true"
+			>
+				Nope
+			</div>
+			<div
+				className={`card-stamp card-stamp-like${dragX > 24 ? " is-visible" : ""}`}
+				aria-hidden="true"
+			>
+				Add
+			</div>
+
 			<div className="card-head">
 				<div className="asset-title">
 					<AssetMark
@@ -805,9 +848,11 @@ export function SwipeCard({
 						<p>{candidate.name}</p>
 					</div>
 				</div>
-				<div className="allocation-stamp">
-					<strong>{ticketSizeUsd}</strong>
-					<span>
+				<div className="allocation-tags" aria-label={`Ticket ${ticketSizeUsd} ${stableToken}`}>
+					<span className="allocation-tag allocation-tag-amount">
+						{ticketSizeUsd}
+					</span>
+					<span className="allocation-tag allocation-tag-token">
 						<StableTokenLabel token={stableToken} />
 					</span>
 				</div>

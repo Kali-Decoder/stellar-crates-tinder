@@ -1,8 +1,13 @@
-import {
-	Bot,
-	ShoppingBasket,
-} from "lucide-react";
+import { Bot, ShoppingBasket } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	BrowserRouter,
+	Navigate,
+	Route,
+	Routes,
+	useLocation,
+	useNavigate,
+} from "react-router-dom";
 import {
 	fillFeedPage,
 	nextFeedExcludedAssetIds,
@@ -26,11 +31,22 @@ import { AppShell } from "../components/AppShell";
 import { AssetIconProvider } from "../components/AssetMark";
 import { BudgetRail } from "../components/BudgetRail";
 import { Confetti } from "../components/magicui/confetti";
+import { LicenseGate } from "../components/LicenseModal";
 import { ReceiptScreen } from "../components/ReceiptScreen";
 import { DocsScreen } from "../components/DocsScreen";
 import { SwipeCard } from "../components/SwipeCard";
-import { SwipeGestures } from "../components/SwipeGestures";
+import {
+	type AppPage,
+	APP_PATHS,
+	pageForShellView,
+	pageFromPath,
+	pathForPage,
+	type ShellView,
+	shellViewForPage,
+} from "../pages";
 import { STELLAR_SUPPORTED_ASSET_COUNT } from "../stellar/config";
+import { playSwipeSound, unlockSwipeAudio } from "../swipe-sounds";
+import { ensureUserForWallet, type SwyftUser } from "../user-storage";
 import { createMockApi } from "./api";
 import { MOCK_CONFIG } from "./data";
 import { MockAccount } from "./MockAccount";
@@ -38,23 +54,48 @@ import { MockLanding } from "./MockLanding";
 import { MockOnboarding } from "./MockOnboarding";
 import { MockPositions } from "./MockPositions";
 import { MockReview } from "./MockReview";
+import { buildDemoSettlement } from "./mock-portfolio-fixtures";
 import { useStellarWallet } from "../stellar/useStellarWallet";
+
+const DEMO_ACTIVITY = buildDemoSettlement();
 
 const TWITTER_HANDLE = "swyftdotfun";
 const TWITTER_URL = `https://x.com/${TWITTER_HANDLE}`;
 
 installApiOverride(createMockApi() as typeof api);
 
-type View = "week" | "positions" | "receipts" | "account" | "docs";
-type Stage = "landing" | "docs" | "loading" | "onboarding" | "swipe" | "review";
 type DecisionFeedback = "invest" | "skip";
 
+const AUTHED_PAGES = new Set<AppPage>([
+	"onboarding",
+	"basket",
+	"review",
+	"portfolio",
+	"activity",
+	"account",
+]);
+
 export function MockApp() {
+	return (
+		<BrowserRouter>
+			<LicenseGate>
+				<Routes>
+					<Route path="*" element={<MockAppRoutes />} />
+				</Routes>
+			</LicenseGate>
+		</BrowserRouter>
+	);
+}
+
+function MockAppRoutes() {
 	const stellar = useStellarWallet();
+	const navigate = useNavigate();
+	const location = useLocation();
+	const page = pageFromPath(location.pathname);
+	const view = shellViewForPage(page);
+
 	const [config] = useState<PublicConfig>(MOCK_CONFIG);
-	const [view, setView] = useState<View>("week");
-	const [stage, setStage] = useState<Stage>("landing");
-	const [docsReturnStage, setDocsReturnStage] = useState<Stage>("landing");
+	const [docsReturnPage, setDocsReturnPage] = useState<AppPage>("landing");
 	const [onboardingChain, setOnboardingChain] =
 		useState<AppChain>("ROBINHOOD");
 	const [session, setSession] = useState<WeeklySession>();
@@ -63,14 +104,20 @@ export function MockApp() {
 	const [index, setIndex] = useState(0);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [assetInfoOpen, setAssetInfoOpen] = useState(false);
-	const [settlement, setSettlement] = useState<ExecutionRecord>();
-	const [receiptCandidates, setReceiptCandidates] = useState<Candidate[]>([]);
+	const [settlement, setSettlement] = useState<ExecutionRecord>(
+		() => DEMO_ACTIVITY.record,
+	);
+	const [receiptCandidates, setReceiptCandidates] = useState<Candidate[]>(
+		() => DEMO_ACTIVITY.candidates,
+	);
 	const [error, setError] = useState("");
 	const [decisionFeedback, setDecisionFeedback] = useState<DecisionFeedback>();
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [feedExhausted, setFeedExhausted] = useState(false);
 	const [basketSheetOpen, setBasketSheetOpen] = useState(false);
 	const [isCompact, setIsCompact] = useState(false);
+	const [user, setUser] = useState<SwyftUser>();
+	const [sessionBusy, setSessionBusy] = useState(false);
 	const decisionTimer = useRef<number | undefined>(undefined);
 	const warningsByAssetId = useRef(new Map<string, string[]>());
 
@@ -97,50 +144,63 @@ export function MockApp() {
 	const stableToken = "USDC";
 	const canAddCurrent = selectedTotalUsd + ticketSizeUsd <= periodLimitUsd;
 
-	const loadSession = useCallback(async (next: OnboardingPreferences) => {
-		setError("");
-		setView("week");
-		setStage("loading");
-		setPreferences(next);
-		setSession(undefined);
-		setFeed(undefined);
-		setIndex(0);
-		setSelectedIds([]);
-		setFeedExhausted(false);
-		const minimumLoader = new Promise((resolve) =>
-			window.setTimeout(resolve, 700),
-		);
-		try {
-			await api.savePreferences(next);
-			const opened = await api.openSession(
-				next.cadence,
-				next.executionProvider,
-				next.activeChain,
-				next.feedRankingProvider,
-			);
-			const generated = await api.generateFeed(opened.id, next);
-			await minimumLoader;
-			for (const candidate of generated.candidates) {
-				warningsByAssetId.current.set(
-					candidate.assetId,
-					generated.feed.warnings,
-				);
-			}
-			setSession(opened);
-			setFeed({
-				...generated,
-				candidates: fillFeedPage(generated.candidates),
-			});
-			setStage("swipe");
+	const goTo = useCallback(
+		(next: AppPage, options?: { replace?: boolean }) => {
 			window.scrollTo({ top: 0, behavior: "auto" });
-		} catch (caught) {
-			await minimumLoader;
-			setError(
-				caught instanceof Error ? caught.message : "Could not open mock session",
+			navigate(pathForPage(next), { replace: options?.replace });
+		},
+		[navigate],
+	);
+
+	const loadSession = useCallback(
+		async (next: OnboardingPreferences) => {
+			setError("");
+			setSessionBusy(true);
+			setPreferences(next);
+			setSession(undefined);
+			setFeed(undefined);
+			setIndex(0);
+			setSelectedIds([]);
+			setFeedExhausted(false);
+			goTo("basket");
+			const minimumLoader = new Promise((resolve) =>
+				window.setTimeout(resolve, 700),
 			);
-			setStage("swipe");
-		}
-	}, []);
+			try {
+				await api.savePreferences(next);
+				const opened = await api.openSession(
+					next.cadence,
+					next.executionProvider,
+					next.activeChain,
+					next.feedRankingProvider,
+				);
+				const generated = await api.generateFeed(opened.id, next);
+				await minimumLoader;
+				for (const candidate of generated.candidates) {
+					warningsByAssetId.current.set(
+						candidate.assetId,
+						generated.feed.warnings,
+					);
+				}
+				setSession(opened);
+				setFeed({
+					...generated,
+					candidates: fillFeedPage(generated.candidates),
+				});
+				window.scrollTo({ top: 0, behavior: "auto" });
+			} catch (caught) {
+				await minimumLoader;
+				setError(
+					caught instanceof Error
+						? caught.message
+						: "Could not open mock session",
+				);
+			} finally {
+				setSessionBusy(false);
+			}
+		},
+		[goTo],
+	);
 
 	useEffect(
 		() => () => {
@@ -172,6 +232,20 @@ export function MockApp() {
 			document.documentElement.classList.remove("basket-sheet-lock");
 		};
 	}, [basketSheetOpen]);
+
+	useEffect(() => {
+		if (!wallet) {
+			setUser(undefined);
+			return;
+		}
+		setUser(ensureUserForWallet(wallet));
+	}, [wallet]);
+
+	useEffect(() => {
+		if (!AUTHED_PAGES.has(page)) return;
+		if (wallet) return;
+		goTo("landing", { replace: true });
+	}, [goTo, page, wallet]);
 
 	const loadMoreCandidates = useCallback(async () => {
 		if (!feed || !preferences || !session || loadingMore || feedExhausted)
@@ -237,7 +311,6 @@ export function MockApp() {
 		if (add && !selectedIds.includes(current.assetId) && canAddCurrent) {
 			setSelectedIds((ids) => [...ids, current.assetId]);
 			if (isCompact) {
-				// Brief pulse on the FAB without forcing the sheet open mid-swipe.
 				setBasketSheetOpen(false);
 			}
 		}
@@ -245,13 +318,14 @@ export function MockApp() {
 	}
 
 	function goReview() {
-		window.scrollTo({ top: 0, behavior: "auto" });
 		setBasketSheetOpen(false);
-		setStage("review");
+		goTo("review");
 	}
 
 	function animateDecision(add: boolean) {
 		if (!current || decisionFeedback || (add && !canAddCurrent)) return;
+		unlockSwipeAudio();
+		playSwipeSound(add ? "add" : "skip");
 		setDecisionFeedback(add ? "invest" : "skip");
 		decisionTimer.current = window.setTimeout(() => {
 			decide(add);
@@ -260,8 +334,11 @@ export function MockApp() {
 		}, 300);
 	}
 
+	const animateDecisionRef = useRef(animateDecision);
+	animateDecisionRef.current = animateDecision;
+
 	useEffect(() => {
-		if (stage !== "swipe" || view !== "week") return;
+		if (page !== "basket") return;
 		function onKeyDown(event: KeyboardEvent) {
 			const target = event.target as HTMLElement | null;
 			if (
@@ -274,54 +351,40 @@ export function MockApp() {
 			}
 			if (event.key === "ArrowLeft") {
 				event.preventDefault();
-				animateDecision(false);
+				animateDecisionRef.current(false);
 			}
 			if (event.key === "ArrowRight") {
 				event.preventDefault();
-				animateDecision(true);
+				animateDecisionRef.current(true);
 			}
 		}
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [stage, view, current, decisionFeedback, canAddCurrent, selectedIds]);
+	}, [page]);
 
 	function remove(assetId: string) {
 		setSelectedIds((ids) => ids.filter((id) => id !== assetId));
 		setFeedExhausted(false);
 	}
 
-	function navigate(target: View) {
-		if (stage === "onboarding") return;
-		window.scrollTo({ top: 0, behavior: "auto" });
-		setView(target);
-		if (target === "week" && stage === "loading" && feed) setStage("swipe");
+	function navigateShell(target: ShellView) {
+		if (page === "onboarding") return;
+		goTo(pageForShellView(target));
 	}
 
-	function openDocs(from: Stage = stage) {
-		setDocsReturnStage(from === "docs" ? "landing" : from);
-		window.scrollTo({ top: 0, behavior: "auto" });
-		if (from === "landing" || from === "onboarding") {
-			setStage("docs");
-			return;
-		}
-		setView("docs");
+	function openDocs(from: AppPage = page) {
+		setDocsReturnPage(from === "docs" ? "landing" : from);
+		goTo("docs");
 	}
 
 	function closeDocs() {
-		window.scrollTo({ top: 0, behavior: "auto" });
-		if (docsReturnStage === "landing" || docsReturnStage === "onboarding") {
-			setStage(docsReturnStage);
-			return;
-		}
-		setView("week");
-		if (docsReturnStage === "swipe" || docsReturnStage === "review") {
-			setStage(docsReturnStage);
-		}
+		goTo(docsReturnPage === "docs" ? "landing" : docsReturnPage);
 	}
 
 	async function handleConnectWallet() {
 		try {
-			await stellar.connect();
+			const address = await stellar.connect();
+			setUser(ensureUserForWallet(address));
 		} catch {
 			// User closed modal or wallet rejected — keep existing connect CTA.
 		}
@@ -329,18 +392,20 @@ export function MockApp() {
 
 	async function enterFromLanding() {
 		if (stellar.address) {
-			setStage("onboarding");
+			setUser(ensureUserForWallet(stellar.address));
+			goTo("onboarding");
 			return;
 		}
 		try {
-			await stellar.connect();
-			setStage("onboarding");
+			const address = await stellar.connect();
+			setUser(ensureUserForWallet(address));
+			goTo("onboarding");
 		} catch {
 			// Stay on landing if the modal is dismissed.
 		}
 	}
 
-	if (stage === "docs") {
+	if (page === "docs" && (!wallet || docsReturnPage === "landing")) {
 		return (
 			<div className="docs-standalone">
 				<DocsScreen onBack={closeDocs} />
@@ -348,7 +413,7 @@ export function MockApp() {
 		);
 	}
 
-	if (stage === "landing") {
+	if (page === "landing") {
 		return (
 			<MockLanding
 				onSignIn={() => void enterFromLanding()}
@@ -359,18 +424,30 @@ export function MockApp() {
 		);
 	}
 
+	if (AUTHED_PAGES.has(page) && !wallet) {
+		return <Navigate to={APP_PATHS.landing} replace />;
+	}
+
 	return (
 		<AssetIconProvider>
 			<AppShell
 				active={view}
-				onNavigate={navigate}
+				onNavigate={navigateShell}
 				wallet={wallet}
+				username={user?.username}
 				mockMode
 				walletReady
 				walletConnecting={stellar.isConnecting}
 				onWallet={() => void handleConnectWallet()}
-				onDisconnect={() => void stellar.disconnect()}
-				navigationEnabled={stage !== "onboarding"}
+				onDisconnect={() => {
+					void stellar.disconnect();
+					setUser(undefined);
+					setPreferences(undefined);
+					setFeed(undefined);
+					setSession(undefined);
+					goTo("landing");
+				}}
+				navigationEnabled={page !== "onboarding"}
 				activeChain={activeChain}
 				onChainChange={() => undefined}
 				solanaWallets={[]}
@@ -378,7 +455,7 @@ export function MockApp() {
 				solanaAvailable={config.solana.available}
 				onSolanaWalletChange={() => undefined}
 			>
-				{stage === "onboarding" ? (
+				{page === "onboarding" ? (
 					<MockOnboarding
 						config={config}
 						onComplete={loadSession}
@@ -388,28 +465,28 @@ export function MockApp() {
 						stellarError={stellar.error}
 						onConnectWallet={() => void handleConnectWallet()}
 					/>
-				) : view === "receipts" ? (
+				) : page === "activity" ? (
 					<ReceiptScreen
 						record={settlement}
 						selected={receiptCandidates.length ? receiptCandidates : selected}
 						feed={feed}
-						demoMode={!settlement?.transactionHashes.some((h) => h.length > 40)}
+						demoMode={false}
 						onResume={async () => {
 							if (!settlement) return;
-							setSettlement(await api.reconcile(settlement.plan.executionId));
+							try {
+								setSettlement(await api.reconcile(settlement.plan.executionId));
+							} catch {
+								setSettlement(DEMO_ACTIVITY.record);
+							}
 						}}
-						onViewPortfolio={() => {
-							window.scrollTo({ top: 0, behavior: "auto" });
-							setView("positions");
-						}}
+						onViewPortfolio={() => goTo("portfolio")}
 						onStartNextBasket={() => {
 							if (preferences) {
 								void loadSession(preferences);
-								setView("week");
 							}
 						}}
 					/>
-				) : view === "positions" ? (
+				) : page === "portfolio" ? (
 					<MockPositions
 						candidates={Array.from(
 							new Map(
@@ -418,38 +495,40 @@ export function MockApp() {
 						)}
 						wallet={wallet ?? ""}
 					/>
-				) : view === "docs" ? (
-					<DocsScreen onBack={() => navigate("week")} />
-				) : view === "account" && preferences ? (
+				) : page === "docs" ? (
+					<DocsScreen onBack={() => goTo("basket")} />
+				) : page === "account" && preferences ? (
 					<MockAccount
 						wallet={wallet ?? ""}
+						user={user}
+						username={user?.username}
 						preferences={preferences}
 						onResetPlan={() => {
 							void loadSession(preferences);
-							setView("week");
 						}}
+						onOpenPortfolio={() => goTo("portfolio")}
 						onDisconnect={() => {
 							void stellar.disconnect();
-							setStage("landing");
+							setUser(undefined);
 							setPreferences(undefined);
 							setFeed(undefined);
 							setSession(undefined);
+							goTo("landing");
 						}}
 					/>
-				) : stage === "review" && session && feed ? (
+				) : page === "account" ? (
+					<Navigate to={APP_PATHS.onboarding} replace />
+				) : page === "review" && session && feed ? (
 					<MockReview
 						session={session}
 						feed={feed}
 						selected={selected}
 						onRemove={remove}
-						onBack={() => {
-							window.scrollTo({ top: 0, behavior: "auto" });
-							setStage("swipe");
-						}}
+						onBack={() => goTo("basket")}
 						onSettled={(record) => {
 							setSettlement(record);
 							setReceiptCandidates(selected);
-							setView("receipts");
+							goTo("activity");
 						}}
 						onExecutionChange={setSettlement}
 						ticketSizeUsd={ticketSizeUsd}
@@ -457,13 +536,15 @@ export function MockApp() {
 						wallet={wallet ?? ""}
 						activeChain={activeChain}
 					/>
+				) : page === "review" ? (
+					<Navigate to={APP_PATHS.basket} replace />
 				) : (
 					<main className="swipe-page">
 						<section className="swipe-workspace">
 							<header className="page-heading">
 								<h1>Build your basket</h1>
 								<p>
-									Drag the card, tap Skip / Add, or use{" "}
+									Drag the card, hover to Reject / Add, or use{" "}
 									<kbd className="inline-key">←</kbd>{" "}
 									<kbd className="inline-key">→</kbd>.
 								</p>
@@ -481,7 +562,7 @@ export function MockApp() {
 										Try again
 									</button>
 								</div>
-							) : stage === "loading" || !feed ? (
+							) : sessionBusy || !feed ? (
 								<div className="loading-state">
 									<div className="feed-loader" role="img" aria-label="Mock">
 										<b>UI</b>
@@ -501,13 +582,7 @@ export function MockApp() {
 											infoOpen={assetInfoOpen}
 											onInfoOpenChange={setAssetInfoOpen}
 											onSwipe={animateDecision}
-										/>
-										<SwipeGestures
-											onSkip={() => animateDecision(false)}
-											onAdd={() => animateDecision(true)}
-											addLabel={`Add ${ticketSizeUsd} ${stableToken}`}
-											disabled={Boolean(decisionFeedback)}
-											addDisabled={!canAddCurrent}
+											canAdd={canAddCurrent}
 										/>
 									</div>
 									<footer className="swipe-session-footer">

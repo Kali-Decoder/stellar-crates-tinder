@@ -77,6 +77,14 @@ flowchart LR
   Updater["price-updater.mjs"] -->|"set_prices"| O
 ```
 
+## Rebalancing (current behavior)
+
+1. Deposit parks DEMOUSD in the bucket and mints shares; holdings are idle USDC until rebalanced.
+2. Targets come from `create_bucket` allocations (`target_bps` sum to 10_000). The UI uses equal weight across deployable symbols.
+3. Anyone may call permissionless `rebalance` on `bucket-vault`. Drift within `drift_bps` (~2%) or dust under $1 is a no-op.
+4. Overweight legs sell → USDC; underweight legs buy ← USDC via admin-seeded internal CP pools. NAV uses DIA oracle prices (fail closed if stale).
+5. No automated keeper is shipped in-repo yet — scheduling is ops. Details: [CONTRACTS.md](./CONTRACTS.md).
+
 ## Legacy server path (optional)
 
 Basket metadata / PnL go through `../server` (`/api/stellar/*`). On-chain invest still signs directly in Freighter — it does not go through Express.

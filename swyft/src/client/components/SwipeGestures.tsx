@@ -1,4 +1,5 @@
 import { Heart, X } from "lucide-react";
+import { unlockSwipeAudio } from "../swipe-sounds";
 
 export function SwipeGestures({
 	onSkip,
@@ -14,7 +15,12 @@ export function SwipeGestures({
 	addDisabled?: boolean;
 }) {
 	return (
-		<div className="gesture-bar" role="group" aria-label="Swipe actions">
+		<div
+			className="gesture-bar"
+			role="group"
+			aria-label="Swipe actions"
+			onPointerDown={unlockSwipeAudio}
+		>
 			<button
 				type="button"
 				className="gesture gesture-skip"

@@ -34,13 +34,36 @@ Testnet stablecoin is **DEMOUSD** (labeled **USDC** in the UI).
 | Portfolio | Buckets + marked PnL (portfolio API / Mongo) |
 | Activity | Latest receipt / tx hashes |
 | Account | Wallet, plan, disconnect |
-| Docs | This guide, in-product |
+| Docs | This guide, in-product (incl. architecture & rebalancing) |
 
 ## DIA oracle
 
 - Spot prices: DIA RWA REST (`/dia-api` Vite proxy)  
 - Charts: market history when available, anchored to DIA spot  
 - On-chain: `dia-oracle` feeds (`AAPL/USD`, …) via `npm run oracle:update`
+
+## Architecture
+
+Default path: Vite `MockApp` + Freighter → Soroban RPC → `bucket-vault` / DEMOUSD / `dia-oracle`. Optional `server/` portfolio API stores basket metadata and DIA-marked PnL.
+
+| Layer | Role |
+|---|---|
+| Client (`src/client`) | Landing → plan → swipe → review → portfolio |
+| `stellar/` | Wallet kit, RPC, vault invest helpers, DIA spots |
+| Contracts | `share-token`, `bucket-vault`, `dia-oracle` |
+| `server/` | `/api/stellar/*` baskets + PnL (Mongo) |
+
+Deeper notes: [ARCHITECTURE.md](./ARCHITECTURE.md), [CONTRACTS.md](./CONTRACTS.md).
+
+## Rebalancing
+
+1. **Invest** creates a bucket with equal-weight `target_bps` (sum 10_000) and deposits DEMOUSD → share mint. Holdings start as idle USDC.
+2. **`rebalance(bucket_id, …)`** is permissionless on `bucket-vault`. A keeper (or anyone) can call it.
+3. Vault prices legs via DIA, skips if drift ≤ `drift_bps` (~2%) or dust &lt; $1, then sells overweight / buys underweight against internal CP pools.
+4. NAV always uses oracle spots (fail closed if stale). Slippage capped; `min_outs` bound caller behavior.
+5. Portfolio UI marks with DIA pre-rebalance; prefer on-chain `portfolio_value` after rebalance for exact NAV.
+
+Automated keeper scheduling is ops — not yet an in-app bot. See [CONTRACTS.md](./CONTRACTS.md) § Rebalance.
 
 ## Contracts & API
 
@@ -50,11 +73,9 @@ Testnet stablecoin is **DEMOUSD** (labeled **USDC** in the UI).
 | Portfolio Express API | `server/` (`/api/stellar/*`) |
 | Deploy addresses | `swyft/src/client/stellar/deploy.json` |
 
-Deeper notes:
+Also:
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [USER_FLOW.md](./USER_FLOW.md)
-- [CONTRACTS.md](./CONTRACTS.md)
 - [STELLAR_PORTFOLIO_API.md](./STELLAR_PORTFOLIO_API.md)
 
 ## Safety
