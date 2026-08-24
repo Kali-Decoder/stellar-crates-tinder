@@ -14,14 +14,27 @@ loadEnvironment({ path: path.resolve(serverRoot, "../swyft/.env.local") });
 loadEnvironment({ path: path.resolve(serverRoot, "../swyft/.env") });
 
 const port = Number(process.env.STELLAR_PORTFOLIO_PORT ?? process.env.PORT ?? 8787);
-const origin = process.env.PUBLIC_ORIGIN ?? "http://localhost:5173";
+/** Browser Origin has no trailing slash — normalize so Render env typos don't break CORS. */
+const origin = (process.env.PUBLIC_ORIGIN ?? "http://localhost:5173").replace(
+	/\/+$/,
+	"",
+);
 
 async function main() {
 	const app = express();
 	app.use((request, response, next) => {
-		response.setHeader("Access-Control-Allow-Origin", origin);
+		const requestOrigin = request.headers.origin;
+		const allowed =
+			requestOrigin &&
+			(requestOrigin === origin ||
+				requestOrigin.replace(/\/+$/, "") === origin);
+		response.setHeader(
+			"Access-Control-Allow-Origin",
+			allowed ? requestOrigin : origin,
+		);
 		response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
 		response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+		response.setHeader("Vary", "Origin");
 		if (request.method === "OPTIONS") {
 			response.status(204).end();
 			return;
