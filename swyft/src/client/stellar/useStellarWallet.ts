@@ -8,6 +8,7 @@ import {
 
 export function useStellarWallet() {
 	const [address, setAddress] = useState<string>();
+	const [ready, setReady] = useState(false);
 	const [status, setStatus] = useState<
 		"idle" | "connecting" | "connected" | "error"
 	>("idle");
@@ -16,11 +17,17 @@ export function useStellarWallet() {
 	useEffect(() => {
 		initStellarKit();
 		let cancelled = false;
-		void restoreStellarWallet().then((restored) => {
-			if (cancelled || !restored) return;
-			setAddress(restored);
-			setStatus("connected");
-		});
+		void restoreStellarWallet()
+			.then((restored) => {
+				if (cancelled) return;
+				if (restored) {
+					setAddress(restored);
+					setStatus("connected");
+				}
+			})
+			.finally(() => {
+				if (!cancelled) setReady(true);
+			});
 		return () => {
 			cancelled = true;
 		};
@@ -54,6 +61,7 @@ export function useStellarWallet() {
 
 	return {
 		address,
+		ready,
 		status,
 		error,
 		isConnected: Boolean(address),

@@ -46,6 +46,10 @@ import {
 } from "../pages";
 import { STELLAR_SUPPORTED_ASSET_COUNT } from "../stellar/config";
 import { playSwipeSound, unlockSwipeAudio } from "../swipe-sounds";
+import {
+	readAccountPreferences,
+	writeAccountPreferences,
+} from "../preferences-storage";
 import { ensureUserForWallet, type SwyftUser } from "../user-storage";
 import { createMockApi } from "./api";
 import { MOCK_CONFIG } from "./data";
@@ -61,6 +65,7 @@ const DEMO_ACTIVITY = buildDemoSettlement();
 
 const TWITTER_HANDLE = "swyftdotfun";
 const TWITTER_URL = `https://x.com/${TWITTER_HANDLE}`;
+const LAST_APP_PAGE_KEY = "swyft:last-app-page";
 
 installApiOverride(createMockApi() as typeof api);
 
@@ -72,6 +77,34 @@ const AUTHED_PAGES = new Set<AppPage>([
 	"activity",
 	"account",
 ]);
+
+function readLastAppPage(): AppPage | undefined {
+	try {
+		const raw = localStorage.getItem(LAST_APP_PAGE_KEY);
+		if (!raw || !AUTHED_PAGES.has(raw as AppPage)) return;
+		return raw as AppPage;
+	} catch {
+		return;
+	}
+}
+
+function writeLastAppPage(page: AppPage) {
+	try {
+		if (AUTHED_PAGES.has(page)) {
+			localStorage.setItem(LAST_APP_PAGE_KEY, page);
+		}
+	} catch {
+		/* ignore quota / private mode */
+	}
+}
+
+function clearLastAppPage() {
+	try {
+		localStorage.removeItem(LAST_APP_PAGE_KEY);
+	} catch {
+		/* ignore */
+	}
+}
 
 export function MockApp() {
 	return (
@@ -140,7 +173,7 @@ function MockAppRoutes() {
 	);
 
 	const loadSession = useCallback(
-		async (next: OnboardingPreferences) => {
+		async (next: OnboardingPreferences, options?: { replace?: boolean }) => {
 			setError("");
 			setSessionBusy(true);
 			setPreferences(next);
@@ -149,12 +182,16 @@ function MockAppRoutes() {
 			setIndex(0);
 			setSelectedIds([]);
 			setFeedExhausted(false);
-			goTo("basket");
+			goTo("basket", { replace: options?.replace });
 			const minimumLoader = new Promise((resolve) =>
 				window.setTimeout(resolve, 700),
 			);
 			try {
 				await api.savePreferences(next);
+				if (wallet) {
+					const account = ensureUserForWallet(wallet);
+					if (account) writeAccountPreferences(account.id, next);
+				}
 				const opened = await api.openSession(
 					next.cadence,
 					next.executionProvider,
@@ -186,7 +223,7 @@ function MockAppRoutes() {
 				setSessionBusy(false);
 			}
 		},
-		[goTo],
+		[goTo, wallet],
 	);
 
 	useEffect(() => {
@@ -222,10 +259,60 @@ function MockAppRoutes() {
 	}, [wallet]);
 
 	useEffect(() => {
+		if (AUTHED_PAGES.has(page)) writeLastAppPage(page);
+	}, [page]);
+
+	/** Wait for Freighter restore before kicking authed routes to landing. */
+	useEffect(() => {
+		if (!stellar.ready) return;
 		if (!AUTHED_PAGES.has(page)) return;
 		if (wallet) return;
+		clearLastAppPage();
 		goTo("landing", { replace: true });
-	}, [goTo, page, wallet]);
+	}, [goTo, page, stellar.ready, wallet]);
+
+	/**
+	 * After a refresh bounce to `/`, or a hard reload on `/` with a connected
+	 * wallet, resume the last in-app page instead of sticking on marketing.
+	 */
+	useEffect(() => {
+		if (!stellar.ready || !wallet) return;
+		if (page !== "landing") return;
+		const last = readLastAppPage();
+		if (!last) return;
+		goTo(last, { replace: true });
+	}, [goTo, page, stellar.ready, wallet]);
+
+	/** Rebuild basket feed / restore plan after refresh when prefs were saved. */
+	useEffect(() => {
+		if (!stellar.ready || !wallet || !user) return;
+		if (preferences || sessionBusy) return;
+		const stored = readAccountPreferences(user.id);
+		if (page === "basket" || page === "review") {
+			if (!stored) {
+				goTo("onboarding", { replace: true });
+				return;
+			}
+			void loadSession(stored, { replace: true });
+			return;
+		}
+		if (page === "account") {
+			if (!stored) {
+				goTo("onboarding", { replace: true });
+				return;
+			}
+			setPreferences(stored);
+		}
+	}, [
+		goTo,
+		loadSession,
+		page,
+		preferences,
+		sessionBusy,
+		stellar.ready,
+		user,
+		wallet,
+	]);
 
 	const loadMoreCandidates = useCallback(async () => {
 		if (!feed || !preferences || !session || loadingMore || feedExhausted)
@@ -359,6 +446,15 @@ function MockAppRoutes() {
 		);
 	}
 
+	if (!stellar.ready) {
+		return (
+			<main className="loading-state page-loader">
+				<span className="loader-ring" />
+				<h1>Restoring session…</h1>
+			</main>
+		);
+	}
+
 	if (AUTHED_PAGES.has(page) && !wallet) {
 		return <Navigate to={APP_PATHS.landing} replace />;
 	}
@@ -380,6 +476,7 @@ function MockAppRoutes() {
 					setPreferences(undefined);
 					setFeed(undefined);
 					setSession(undefined);
+					clearLastAppPage();
 					goTo("landing");
 				}}
 				navigationEnabled={page !== "onboarding"}
@@ -438,6 +535,7 @@ function MockAppRoutes() {
 							setPreferences(undefined);
 							setFeed(undefined);
 							setSession(undefined);
+							clearLastAppPage();
 							goTo("landing");
 						}}
 					/>
