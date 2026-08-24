@@ -1,0 +1,24 @@
+{
+  "name": "swyft.fun",
+  "short_name": "swyft",
+  "description": "Non-custodial swipe investing for tokenized RWAs on Stellar.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070b11",
+  "theme_color": "#070b11",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/investmade-logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

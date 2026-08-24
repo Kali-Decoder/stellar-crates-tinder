@@ -1065,18 +1065,28 @@ button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px
   .asset-pick-toolbar {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 3;
+    gap: 10px;
+    margin-bottom: 10px;
+    background: color-mix(in srgb, var(--paper) 94%, var(--ground));
   }
   .asset-pick-filters {
     position: sticky;
-    top: 58px;
+    top: 0;
     z-index: 2;
-    padding: 8px 0;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 8px 0 10px;
     background: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--ground) 92%, transparent),
-      color-mix(in srgb, var(--ground) 88%, transparent)
+      color-mix(in srgb, var(--ground) 96%, transparent) 70%,
+      transparent
     );
+  }
+  .asset-pick-filter {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
   }
 }
 .page-heading h1,
@@ -4321,6 +4331,64 @@ html[data-chain="stellar"] .onboarding-chain-selector button.active {
   border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   animation: basket-detail-in .22s ease both;
 }
+.basket-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 85%, transparent);
+}
+.basket-actions-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.basket-action-block {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ground) 35%, var(--paper));
+}
+.basket-action-block > small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.basket-pct-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.basket-pct {
+  min-height: 40px !important;
+  min-width: 0;
+  padding: 0 8px !important;
+  font-size: 13px !important;
+}
+.basket-pct.is-active {
+  border-color: var(--acid);
+  background: color-mix(in srgb, var(--acid) 16%, var(--paper));
+  color: var(--ink);
+}
+.basket-withdraw-preview {
+  color: var(--ink);
+  font-weight: 700;
+}
+.basket-action-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.basket-action-error {
+  color: var(--danger, #c23b3b);
+  font-size: 12px;
+  font-weight: 700;
+}
 @keyframes basket-detail-in {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: none; }
@@ -4959,7 +5027,20 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
   .review-page { grid-template-columns: 1fr; }
   .review-summary { position: static; }
   .onboarding-page {
-    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .onboarding-page:not(.onboarding-focused) {
+    display: flex;
+    flex-direction: column;
+  }
+  .onboarding-page:not(.onboarding-focused) .onboarding-copy {
+    order: 1;
+    padding-bottom: 20px;
+  }
+  .onboarding-page:not(.onboarding-focused) .onboarding-action {
+    order: 2;
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
   }
   .budget-rail { min-width: 0; }
 }
@@ -5208,7 +5289,7 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
     left: 0;
     grid-template-columns: .72fr 1.28fr;
     gap: 9px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    padding: 10px 12px;
     border-top: 1px solid var(--line-strong);
     background: color-mix(in srgb, var(--ground) 96%, transparent);
     backdrop-filter: blur(12px);
@@ -5242,7 +5323,25 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
     left: calc(50% + 20px);
     margin: 0;
   }
-  .receipt-page { padding: 12px 18px 76px; }
+  .receipt-page { padding: 12px 18px calc(86px + env(safe-area-inset-bottom)); }
+  .activity-page { padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
+  .activity-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .activity-filter-chip {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+  .review-assets dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ledger-totals {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ledger-totals strong {
+    font-size: 22px;
+  }
   .receipt-heading {
     grid-template-columns: 60px minmax(0, 1fr);
     gap: 14px;
@@ -5326,10 +5425,10 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
   .activity-technical { padding: 2px 12px 6px; }
   .activity-proof { padding-left: 0; }
   .activity-step-list { padding-left: 0; }
-  .empty-page { padding: 35px 18px 85px; }
+  .empty-page { padding: 35px 18px calc(96px + env(safe-area-inset-bottom)); }
   .onboarding-page {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     min-height: calc(100dvh - 64px);
     height: auto;
     overflow: visible;
@@ -5374,8 +5473,44 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
     background: color-mix(in srgb, var(--paper) 96%, transparent);
     backdrop-filter: blur(12px);
   }
-  .positions-page { padding: 28px 19px 86px; }
-  .account-page { padding: 28px 19px 92px; }
+  .positions-page { padding: 24px 16px calc(96px + env(safe-area-inset-bottom)); }
+  .account-page { padding: 24px 16px calc(100px + env(safe-area-inset-bottom)); }
+  .basket-actions-row {
+    grid-template-columns: 1fr;
+  }
+  .basket-pct-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .trader-chip,
+  .trader-chip-button {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+  .theme-toggle {
+    width: 40px;
+    height: 40px;
+  }
+  .nav-link {
+    min-height: 48px;
+    font-size: 11px;
+    padding-inline: 2px;
+    gap: 2px;
+  }
+  .chart-timeframes button {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0 8px;
+  }
+  .ledger-remove {
+    width: 40px;
+    height: 40px;
+    padding: 10px;
+  }
+  .basket-remove {
+    width: 40px;
+    height: 40px;
+  }
   .account-heading h1 { font-size: 42px; letter-spacing: -2.2px; }
   .account-heading p { font-size: 13px; }
   .trader-profile-hero {

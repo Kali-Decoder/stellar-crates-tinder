@@ -72,3 +72,15 @@ export function pageForShellView(view: ShellView): AppPage {
 			return "basket";
 	}
 }
+
+/** Browser tab titles per route. */
+export const PAGE_DOCUMENT_TITLES: Record<AppPage, string> = {
+	landing: "swyft.fun — Swipe-allocate RWAs on Stellar",
+	onboarding: "Set your budget · swyft.fun",
+	basket: "Build your basket · swyft.fun",
+	review: "Review basket · swyft.fun",
+	portfolio: "Your baskets · swyft.fun",
+	activity: "Activity · swyft.fun",
+	account: "Profile · swyft.fun",
+	docs: "Docs · swyft.fun",
+};

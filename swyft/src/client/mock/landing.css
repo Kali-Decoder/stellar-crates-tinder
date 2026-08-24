@@ -69,7 +69,10 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  padding: 8px 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
 }
 .landing-docs-link:hover {
   color: #fff;
@@ -237,7 +240,8 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  padding: 0;
+  min-height: 44px;
+  padding: 8px 10px;
   transition: color 0.18s ease, transform 0.18s ease;
 }
 .landing-footer-risk:hover {
@@ -1618,6 +1622,10 @@
 /* Landing stays dark to match marketing screens across all sections */
 
 @media (max-width: 900px) {
+  .landing-hero {
+    min-height: auto;
+    padding-block: 36px 48px;
+  }
   .landing-hero,
   .landing-ai,
   .landing-money-grid,

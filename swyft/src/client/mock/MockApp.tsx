@@ -37,6 +37,7 @@ import { DocsScreen } from "../components/DocsScreen";
 import {
 	type AppPage,
 	APP_PATHS,
+	PAGE_DOCUMENT_TITLES,
 	pageForShellView,
 	pageFromPath,
 	pathForPage,
@@ -90,6 +91,10 @@ function MockAppRoutes() {
 	const location = useLocation();
 	const page = pageFromPath(location.pathname);
 	const view = shellViewForPage(page);
+
+	useEffect(() => {
+		document.title = PAGE_DOCUMENT_TITLES[page];
+	}, [page]);
 
 	const [config] = useState<PublicConfig>(MOCK_CONFIG);
 	const [docsReturnPage, setDocsReturnPage] = useState<AppPage>("landing");
