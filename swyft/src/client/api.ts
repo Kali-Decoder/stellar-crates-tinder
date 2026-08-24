@@ -9,6 +9,7 @@ import type {
 	Quote,
 } from "../domain/schemas.js";
 import { ticketSizeToBaseUnits } from "../domain/schemas.js";
+import { apiUrl } from "./api-base";
 
 export interface WeeklySession {
 	id: string;
@@ -259,7 +260,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const wallet = requestAuthProvider?.getWalletAddress();
 	const txOrigin = requestAuthProvider?.getTxOriginAddress();
 	const chain = requestAuthProvider?.getWalletChain() ?? "ROBINHOOD";
-	const response = await fetch(path, {
+	const response = await fetch(apiUrl(path), {
 		...init,
 		headers: {
 			"Content-Type": "application/json",

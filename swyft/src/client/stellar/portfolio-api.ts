@@ -1,6 +1,7 @@
 import { stellarConfig } from "./config";
 import { fetchDiaSpot } from "./dia-api";
 import type { VaultAllocation } from "./vault";
+import { apiUrl } from "../api-base";
 
 export type StellarBasketRecord = {
 	id: string;
@@ -92,7 +93,7 @@ export type WalletPortfolioPayload = {
 };
 
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(path, {
+	const response = await fetch(apiUrl(path), {
 		...init,
 		headers: {
 			"Content-Type": "application/json",

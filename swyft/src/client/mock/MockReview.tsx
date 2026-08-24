@@ -272,7 +272,7 @@ export function MockReview({
 
 	if (loading && phase === "refreshing") {
 		return (
-			<main className="loading-state review-preparing" aria-live="polite">
+			<main className="loading-state review-preparing page-loader" aria-live="polite">
 				<span />
 				<h1>Preparing your basket…</h1>
 			</main>

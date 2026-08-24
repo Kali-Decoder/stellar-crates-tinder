@@ -459,15 +459,8 @@ function MockAppRoutes() {
 				) : (
 					<main className="swipe-page asset-pick-page">
 						<section className="swipe-workspace asset-pick-workspace">
-							<header className="page-heading">
-								<h1>Build your basket</h1>
-								<p>
-									Tap cards to select or deselect. Scroll to browse — no charts,
-									no swipe.
-								</p>
-							</header>
 							{error ? (
-								<div className="fatal-state">
+								<div className="fatal-state page-loader">
 									<h2>Session unavailable</h2>
 									<p>{error}</p>
 									<button
@@ -480,7 +473,7 @@ function MockAppRoutes() {
 									</button>
 								</div>
 							) : sessionBusy || !feed ? (
-								<div className="loading-state">
+								<div className="loading-state page-loader">
 									<div className="feed-loader" role="img" aria-label="Mock">
 										<b>UI</b>
 									</div>
@@ -489,6 +482,13 @@ function MockAppRoutes() {
 								</div>
 							) : (
 								<>
+									<header className="page-heading">
+										<h1>Build your basket</h1>
+										<p>
+											Tap cards to select or deselect. Scroll to browse — no
+											charts, no swipe.
+										</p>
+									</header>
 									<div className="asset-pick-toolbar mt-3">
 										<span>
 											{selected.length} selected ·{" "}

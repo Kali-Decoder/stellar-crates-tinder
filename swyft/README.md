@@ -45,7 +45,18 @@ Product docs in the UI: click **Docs**. Written guide: [`docs/PRODUCT_GUIDE.md`]
 | In-app **Docs** | Landing header/footer + primary nav after sign-in |
 | `tests/` | Vitest for client/domain still used by the UI |
 
-Set `MONGODB_URI` in `../server/.env` (or `swyft/.env`) for persistence. Without it the API uses an in-memory store.
+Set `MONGODB_URI` in `../server/.env` (or copy [`\.env.example`](./.env.example) → `.env`) for persistence. Without it the API uses an in-memory store.
+
+### Deploy env
+
+```bash
+cp .env.example .env
+# UI host: set VITE_* (especially VITE_API_BASE_URL → your portfolio API)
+# API host: set MONGODB_URI + PUBLIC_ORIGIN → your UI URL
+npm run build   # outputs dist/client
+```
+
+Full variable reference: [`.env.example`](./.env.example).
 
 ## Product flow (short)
 

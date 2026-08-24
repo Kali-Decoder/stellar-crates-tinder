@@ -122,6 +122,17 @@ export function MockPositions({
 		[baskets],
 	);
 
+	if (loading && !portfolio) {
+		return (
+			<main className="positions-page">
+				<div className="positions-loading page-loader" role="status" aria-live="polite">
+					<LoaderCircle />
+					<span>Loading baskets…</span>
+				</div>
+			</main>
+		);
+	}
+
 	return (
 		<main className="positions-page">
 			<header className="positions-heading">
@@ -151,7 +162,7 @@ export function MockPositions({
 			) : null}
 
 			{loading ? (
-				<div className="positions-loading">
+				<div className="positions-loading page-loader" role="status" aria-live="polite">
 					<LoaderCircle />
 					<span>Loading baskets…</span>
 				</div>

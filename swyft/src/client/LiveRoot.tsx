@@ -54,7 +54,7 @@ export function LiveRoot() {
 	}
 	if (!config) {
 		return (
-			<main className="loading-state">
+			<main className="loading-state page-loader">
 				<span />
 				<h1>Loading swyft.fun</h1>
 			</main>

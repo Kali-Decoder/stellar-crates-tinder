@@ -517,7 +517,7 @@ export function PositionsScreen({
 				</div>
 			) : portfolioLoading ? (
 				<div
-					className="positions-empty positions-loading"
+					className="positions-empty positions-loading page-loader"
 					role="status"
 					aria-live="polite"
 				>

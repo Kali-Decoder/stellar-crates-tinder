@@ -735,7 +735,7 @@ export function App({ config }: { config: PublicConfig }) {
 									</button>
 								</div>
 							) : stage === "loading" || !feed ? (
-								<div className="loading-state">
+								<div className="loading-state page-loader">
 									<div className="feed-loader" role="img" aria-label="0G">
 										<b>0G</b>
 									</div>
@@ -813,7 +813,7 @@ export function App({ config }: { config: PublicConfig }) {
 									</div>
 								</>
 							) : loadingMore ? (
-								<div className="loading-state loading-more">
+								<div className="loading-state loading-more page-loader">
 									<div className="feed-loader" role="img" aria-label="0G">
 										<b>0G</b>
 									</div>

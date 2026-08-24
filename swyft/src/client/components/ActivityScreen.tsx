@@ -121,6 +121,17 @@ export function ActivityScreen({
 		);
 	}
 
+	if (loading && !events.length) {
+		return (
+			<main className="receipt-page activity-page">
+				<div className="activity-feed-loading page-loader" role="status" aria-live="polite">
+					<span aria-hidden="true" />
+					Loading history…
+				</div>
+			</main>
+		);
+	}
+
 	return (
 		<main className="receipt-page activity-page">
 			<header className="activity-hero">
@@ -222,10 +233,6 @@ export function ActivityScreen({
 				</div>
 
 				{error ? <p className="activity-feed-error">{error}</p> : null}
-
-				{loading && !events.length ? (
-					<p className="activity-feed-loading">Loading history…</p>
-				) : null}
 
 				{!loading && !filtered.length ? (
 					<section className="activity-empty-card">

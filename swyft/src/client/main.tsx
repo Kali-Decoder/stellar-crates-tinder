@@ -35,7 +35,7 @@ function Root() {
 	return (
 		<Suspense
 			fallback={
-				<main className="loading-state">
+				<main className="loading-state page-loader">
 					<span />
 					<h1>Loading swyft.fun</h1>
 				</main>

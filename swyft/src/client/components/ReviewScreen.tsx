@@ -515,7 +515,7 @@ export function ReviewScreen({
 	if (loading && phase === "refreshing") {
 		return (
 			<main
-				className="loading-state review-preparing"
+				className="loading-state review-preparing page-loader"
 				aria-live="polite"
 				aria-busy="true"
 			>
