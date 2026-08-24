@@ -59,6 +59,8 @@ export function MockReview({
 	const [walletBalance, setWalletBalance] = useState<number>();
 	const [faucetBusy, setFaucetBusy] = useState(false);
 	const [now, setNow] = useState(() => Date.now());
+	const [basketName, setBasketName] = useState("");
+	const [nameTouched, setNameTouched] = useState(false);
 	const total = Math.round(selected.length * ticketSizeUsd * 100) / 100;
 	const stableToken = "USDC";
 	const assetIdsKey = selected.map((item) => item.assetId).join("|");
@@ -72,8 +74,18 @@ export function MockReview({
 		() => selected.map((c) => c.symbol).filter(hasStellarToken),
 		[selected],
 	);
+	const suggestedBasketName = useMemo(() => {
+		const symbols = onchainSymbols.slice(0, 3).join("-") || "Basket";
+		return `Swyft ${symbols}`;
+	}, [onchainSymbols]);
+
+	useEffect(() => {
+		if (!nameTouched) setBasketName(suggestedBasketName);
+	}, [nameTouched, suggestedBasketName]);
+
 	const missingOnchain = selected.filter((c) => !hasStellarToken(c.symbol));
 	const canGoOnchain = onchainSymbols.length > 0;
+	const trimmedBasketName = basketName.trim().slice(0, 64);
 
 	const prepare = useCallback(async () => {
 		const currentSelected = selectedRef.current;
@@ -155,6 +167,10 @@ export function MockReview({
 
 	async function confirmOnchain() {
 		if (!record || !wallet) return;
+		if (!trimmedBasketName) {
+			setError("Give your basket a name before investing.");
+			return;
+		}
 		setLoading(true);
 		setPhase("signing");
 		setError("");
@@ -171,7 +187,7 @@ export function MockReview({
 
 			const result = await investBasket({
 				source: wallet,
-				name: `Swyft ${onchainSymbols.slice(0, 3).join("-")} ${new Date().toISOString().slice(0, 10)}`,
+				name: trimmedBasketName,
 				symbols: onchainSymbols,
 				usdAmount: total,
 				onPhase: setStatusLine,
@@ -181,7 +197,7 @@ export function MockReview({
 				await recordStellarBasket({
 					ownerWallet: wallet,
 					bucketId: result.bucketId,
-					name: `Swyft ${onchainSymbols.slice(0, 3).join("-")}`,
+					name: trimmedBasketName,
 					allocations: buildAllocationsFromSymbols(onchainSymbols),
 					depositUsd: total,
 					shares: result.shares,
@@ -214,7 +230,7 @@ export function MockReview({
 			onExecutionChange(settled);
 			onSettled(settled);
 			setStatusLine(
-				`Bucket #${result.bucketId} · ${result.shares} shares minted`,
+				`${trimmedBasketName} · bucket #${result.bucketId} · ${result.shares} shares`,
 			);
 		} catch (caught) {
 			setError(
@@ -392,6 +408,27 @@ export function MockReview({
 						· Quote {Math.ceil(quoteExpiry / 1000)}s
 					</p>
 				</header>
+				<label className="review-name-field">
+					<span>Basket name</span>
+					<input
+						type="text"
+						value={basketName}
+						maxLength={64}
+						placeholder="e.g. Mag 7 · Q1"
+						autoComplete="off"
+						disabled={loading || phase === "signing"}
+						onChange={(event) => {
+							setNameTouched(true);
+							setBasketName(event.target.value.slice(0, 64));
+						}}
+					/>
+					<small>
+						Saved on-chain and in your portfolio history
+						{trimmedBasketName
+							? ` · ${trimmedBasketName.length}/64`
+							: ""}
+					</small>
+				</label>
 				<dl>
 					<div>
 						<dt>Spend</dt>
@@ -454,7 +491,13 @@ export function MockReview({
 						type="button"
 						className="button button-primary"
 						onClick={() => void confirmOnchain()}
-						disabled={!record || loading || quoteExpiry <= 0 || !canGoOnchain}
+						disabled={
+							!record ||
+							loading ||
+							quoteExpiry <= 0 ||
+							!canGoOnchain ||
+							!trimmedBasketName
+						}
 					>
 						{phase === "signing" ? (
 							<>

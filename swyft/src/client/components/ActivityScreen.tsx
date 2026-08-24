@@ -2,6 +2,7 @@ import {
 	ArrowDownLeft,
 	ArrowUpRight,
 	BriefcaseBusiness,
+	ChevronDown,
 	ExternalLink,
 	LoaderCircle,
 	RefreshCw,
@@ -89,6 +90,22 @@ export function ActivityScreen({
 		return map;
 	}, [events]);
 
+	const grouped = useMemo(() => groupByDay(filtered), [filtered]);
+
+	const netFlow = useMemo(() => {
+		let deposits = 0;
+		let withdraws = 0;
+		for (const event of events) {
+			if (event.kind === "deposit" && event.usdAmount > 0) {
+				deposits += event.usdAmount;
+			}
+			if (event.kind === "withdraw" && event.usdAmount > 0) {
+				withdraws += event.usdAmount;
+			}
+		}
+		return { deposits, withdraws, net: deposits - withdraws };
+	}, [events]);
+
 	const latestHashes =
 		latestSettlement?.status === "SETTLED"
 			? latestSettlement.transactionHashes.filter((hash) =>
@@ -98,17 +115,17 @@ export function ActivityScreen({
 
 	if (!wallet) {
 		return (
-			<main className="receipt-page activity-page">
+			<main className="activity-page">
 				<header className="activity-hero">
 					<span className="eyebrow">Activity</span>
 					<h1>Connect Freighter</h1>
 					<p>
-						Your basket create, deposit, withdraw, and rebalance history is
-						stored per wallet.
+						Basket creates, deposits, withdrawals, and rebalances are stored per
+						wallet and linked on Stellar.
 					</p>
 				</header>
 				<section className="activity-empty-card">
-					<p>Connect Freighter to load tagged transaction history.</p>
+					<p>Connect Freighter to load your tagged history.</p>
 					<button
 						type="button"
 						className="button button-primary"
@@ -123,64 +140,74 @@ export function ActivityScreen({
 
 	if (loading && !events.length) {
 		return (
-			<main className="receipt-page activity-page">
-				<div className="activity-feed-loading page-loader" role="status" aria-live="polite">
+			<main className="activity-page">
+				<div
+					className="activity-feed-loading page-loader"
+					role="status"
+					aria-live="polite"
+				>
 					<span className="loader-ring" aria-hidden="true" />
-					Loading history…
+					<p>Loading history…</p>
 				</div>
 			</main>
 		);
 	}
 
 	return (
-		<main className="receipt-page activity-page">
+		<main className="activity-page">
 			<header className="activity-hero">
-				<div className="activity-hero-top">
-					<span className="activity-status-orb is-ok" aria-hidden="true">
-						<Sparkles size={22} />
-					</span>
-					<div>
-						<span className="eyebrow">Activity</span>
-						<h1>Transaction history</h1>
-						<p>
-							Every basket create, USDC approve, deposit, withdrawal, and
-							rebalance — tagged and linked on Stellar.
-						</p>
-					</div>
+				<div className="activity-hero-copy">
+					<span className="eyebrow">Activity</span>
+					<h1>History</h1>
+					<p>
+						On-chain basket events — create, approve, deposit, withdraw,
+						rebalance — tagged and explorer-linked.
+					</p>
 				</div>
-				<div className="activity-hero-tags">
-					<span className="activity-tag">Stellar</span>
-					<span className="activity-tag">bucket-vault</span>
-					<span className="activity-tag">{events.length} events</span>
-				</div>
+				<button
+					type="button"
+					className="button button-outline activity-refresh"
+					onClick={() => void load()}
+					disabled={loading}
+					aria-label="Refresh activity"
+				>
+					{loading ? (
+						<LoaderCircle className="spin" size={16} />
+					) : (
+						<RefreshCw size={16} />
+					)}
+					Refresh
+				</button>
 			</header>
 
 			<section className="activity-summary" aria-label="History summary">
-				<div className="activity-stat">
-					<small>Creates</small>
-					<strong>{counts.create ?? 0}</strong>
-				</div>
-				<div className="activity-stat">
-					<small>Deposits</small>
-					<strong>{counts.deposit ?? 0}</strong>
-				</div>
-				<div className="activity-stat">
-					<small>Withdrawals</small>
-					<strong>{counts.withdraw ?? 0}</strong>
-				</div>
-				<div className="activity-stat">
-					<small>Rebalances</small>
-					<strong>{counts.rebalance ?? 0}</strong>
-				</div>
+				<article className="activity-stat">
+					<small>Events</small>
+					<strong>{events.length}</strong>
+				</article>
+				<article className="activity-stat">
+					<small>Deposited</small>
+					<strong className="is-in">{formatUsd(netFlow.deposits)}</strong>
+				</article>
+				<article className="activity-stat">
+					<small>Withdrawn</small>
+					<strong className="is-out">{formatUsd(netFlow.withdraws)}</strong>
+				</article>
+				<article className="activity-stat">
+					<small>Net flow</small>
+					<strong className={netFlow.net >= 0 ? "is-in" : "is-out"}>
+						{netFlow.net >= 0 ? "+" : ""}
+						{formatUsd(netFlow.net)}
+					</strong>
+				</article>
 			</section>
 
 			{latestHashes.length ? (
 				<section className="activity-latest-banner" aria-label="Latest settlement">
-					<strong>Latest settlement synced</strong>
-					<p>
-						Create · approve · deposit recorded. Open any row below for explorer
-						links and tags.
-					</p>
+					<div>
+						<strong>Latest settle recorded</strong>
+						<p>Create · approve · deposit landed on testnet.</p>
+					</div>
 					<div className="activity-latest-hashes">
 						{latestHashes.map((hash, index) => (
 							<a
@@ -188,10 +215,11 @@ export function ActivityScreen({
 								href={`${EXPLORER}/${hash}`}
 								target="_blank"
 								rel="noreferrer"
-								className="activity-tx-link"
+								className="activity-tx-chip"
 							>
-								{["create", "approve", "deposit"][index] ?? "tx"} {shortHash(hash)}
-								<ExternalLink size={14} aria-hidden="true" />
+								{["create", "approve", "deposit"][index] ?? "tx"}
+								<span>{shortHash(hash)}</span>
+								<ExternalLink size={13} aria-hidden="true" />
 							</a>
 						))}
 					</div>
@@ -199,9 +227,11 @@ export function ActivityScreen({
 			) : null}
 
 			<section className="activity-feed" aria-label="Tagged history">
-				<div className="activity-feed-toolbar">
-					<div className="activity-filter-row" role="tablist" aria-label="Filter">
-						{KIND_FILTERS.map((item) => (
+				<div className="activity-filter-row" role="tablist" aria-label="Filter">
+					{KIND_FILTERS.map((item) => {
+						const count = counts[item.id] ?? 0;
+						if (item.id !== "all" && count === 0) return null;
+						return (
 							<button
 								key={item.id}
 								type="button"
@@ -211,35 +241,23 @@ export function ActivityScreen({
 								onClick={() => setFilter(item.id)}
 							>
 								{item.label}
-								{(counts[item.id] ?? 0) > 0 ? (
-									<span>{counts[item.id]}</span>
-								) : null}
+								{count > 0 ? <span>{count}</span> : null}
 							</button>
-						))}
-					</div>
-					<button
-						type="button"
-						className="button button-secondary activity-refresh"
-						onClick={() => void load()}
-						disabled={loading}
-					>
-						{loading ? (
-							<LoaderCircle className="spin" size={16} />
-						) : (
-							<RefreshCw size={16} />
-						)}
-						Refresh
-					</button>
+						);
+					})}
 				</div>
 
-				{error ? <p className="activity-feed-error">{error}</p> : null}
+				{error ? (
+					<p className="activity-feed-error" role="alert">
+						{error}
+					</p>
+				) : null}
 
 				{!loading && !filtered.length ? (
 					<section className="activity-empty-card">
 						<p>
 							No {filter === "all" ? "" : `${filter} `}events yet. Invest from
-							Review to create a basket — create, approve, and deposit are
-							logged automatically.
+							Review — create, approve, and deposit are logged automatically.
 						</p>
 						<button
 							type="button"
@@ -250,114 +268,154 @@ export function ActivityScreen({
 						</button>
 					</section>
 				) : (
-					<ul className="activity-event-list">
-						{filtered.map((event) => {
-							const open = expandedId === event.id;
-							const copy = kindCopy(event);
-							const Icon = copy.Icon;
-							return (
-								<li
-									key={event.id}
-									className={`activity-event-card kind-${event.kind}${open ? " is-open" : ""}`}
-								>
-									<button
-										type="button"
-										className="activity-event-toggle"
-										aria-expanded={open}
-										onClick={() =>
-											setExpandedId((current) =>
-												current === event.id ? null : event.id,
-											)
-										}
-									>
-										<span className={`activity-event-icon kind-${event.kind}`}>
-											<Icon size={18} aria-hidden="true" />
-										</span>
-										<div className="activity-event-main">
-											<strong>{copy.title}</strong>
-											<small>
-												{event.basketName || `Bucket #${event.bucketId}`}
-												{" · "}
-												{formatWhen(event.at)}
-											</small>
-										</div>
-										<div className="activity-event-side">
-											{event.usdAmount > 0 ? (
-												<span className="activity-amount-tag">
-													{copy.sign}
-													{formatUsd(event.usdAmount)}
-												</span>
-											) : (
-												<span className="activity-status-tag">{copy.badge}</span>
-											)}
-										</div>
-									</button>
-
-									{open ? (
-										<div className="activity-event-detail">
-											<div className="activity-tag-row">
-												{event.tags.map((tag) => (
-													<span key={tag} className="activity-tag">
-														{tag}
-													</span>
-												))}
-											</div>
-											<div className="activity-detail-row">
-												<span>Kind</span>
-												<strong>{event.kind}</strong>
-											</div>
-											<div className="activity-detail-row">
-												<span>Bucket</span>
-												<strong>#{event.bucketId}</strong>
-											</div>
-											{event.shares ? (
-												<div className="activity-detail-row">
-													<span>Shares</span>
-													<strong>{event.shares}</strong>
-												</div>
-											) : null}
-											{symbolsFromMeta(event.meta).length ? (
-												<div className="activity-detail-row">
-													<span>Assets</span>
-													<strong>
-														{symbolsFromMeta(event.meta).join(", ")}
-													</strong>
-												</div>
-											) : null}
-											{event.txHash && STELLAR_HASH.test(event.txHash) ? (
-												<div className="activity-detail-row">
-													<span>Transaction</span>
-													<a
-														href={`${EXPLORER}/${event.txHash}`}
-														target="_blank"
-														rel="noreferrer"
-														className="activity-tx-link"
+					<div className="activity-timeline">
+						{grouped.map((group) => (
+							<section key={group.key} className="activity-day-group">
+								<header className="activity-day-label">
+									<span>{group.label}</span>
+									<em>{group.events.length}</em>
+								</header>
+								<ul className="activity-event-list">
+									{group.events.map((event) => {
+										const open = expandedId === event.id;
+										const copy = kindCopy(event);
+										const Icon = copy.Icon;
+										const symbols = symbolsFromMeta(event.meta);
+										return (
+											<li
+												key={event.id}
+												className={`activity-event-card kind-${event.kind}${open ? " is-open" : ""}`}
+											>
+												<button
+													type="button"
+													className="activity-event-toggle"
+													aria-expanded={open}
+													onClick={() =>
+														setExpandedId((current) =>
+															current === event.id ? null : event.id,
+														)
+													}
+												>
+													<span
+														className={`activity-event-icon kind-${event.kind}`}
+														aria-hidden="true"
 													>
-														{shortHash(event.txHash)}
-														<ExternalLink size={14} aria-hidden="true" />
-													</a>
-												</div>
-											) : null}
-										</div>
-									) : null}
-								</li>
-							);
-						})}
-					</ul>
+														<Icon size={18} />
+													</span>
+													<div className="activity-event-main">
+														<div className="activity-event-title-row">
+															<strong>{copy.title}</strong>
+															<span className={`activity-kind-pill kind-${event.kind}`}>
+																{copy.badge}
+															</span>
+														</div>
+														<small>
+															{event.basketName || `Bucket #${event.bucketId}`}
+															<span aria-hidden="true"> · </span>
+															{formatWhen(event.at)}
+														</small>
+													</div>
+													<div className="activity-event-side">
+														{event.usdAmount > 0 ? (
+															<span
+																className={`activity-amount-tag ${copy.sign === "−" ? "is-out" : "is-in"}`}
+															>
+																{copy.sign}
+																{formatUsd(event.usdAmount)}
+															</span>
+														) : (
+															<span className="activity-time-tag">
+																{formatClock(event.at)}
+															</span>
+														)}
+														<ChevronDown
+															className="activity-chevron"
+															size={18}
+															strokeWidth={2.4}
+															aria-hidden="true"
+														/>
+													</div>
+												</button>
+
+												{open ? (
+													<div className="activity-event-detail">
+														<dl className="activity-detail-grid">
+															<div>
+																<dt>Basket</dt>
+																<dd>
+																	{event.basketName || "Untitled"}{" "}
+																	<span>#{event.bucketId}</span>
+																</dd>
+															</div>
+															<div>
+																<dt>When</dt>
+																<dd>{formatFullWhen(event.at)}</dd>
+															</div>
+															{event.shares ? (
+																<div>
+																	<dt>Shares</dt>
+																	<dd>{trimShares(event.shares)}</dd>
+																</div>
+															) : null}
+															{symbols.length ? (
+																<div>
+																	<dt>Assets</dt>
+																	<dd className="activity-symbol-row">
+																		{symbols.map((symbol) => (
+																			<span key={symbol}>{symbol}</span>
+																		))}
+																	</dd>
+																</div>
+															) : null}
+														</dl>
+
+														{event.tags.length ? (
+															<div className="activity-tag-row">
+																{event.tags.map((tag) => (
+																	<span key={tag} className="activity-tag">
+																		{tag}
+																	</span>
+																))}
+															</div>
+														) : null}
+
+														{event.txHash && STELLAR_HASH.test(event.txHash) ? (
+															<a
+																href={`${EXPLORER}/${event.txHash}`}
+																target="_blank"
+																rel="noreferrer"
+																className="activity-explorer-link"
+															>
+																<span>
+																	<small>Stellar Expert</small>
+																	<strong>{shortHash(event.txHash)}</strong>
+																</span>
+																<ExternalLink size={16} aria-hidden="true" />
+															</a>
+														) : null}
+													</div>
+												) : null}
+											</li>
+										);
+									})}
+								</ul>
+							</section>
+						))}
+					</div>
 				)}
 			</section>
 
-			<div className="receipt-actions activity-feed-actions">
+			<div className="activity-feed-actions">
 				<button
 					type="button"
 					className="button button-primary"
 					onClick={onViewPortfolio}
 				>
-					<BriefcaseBusiness aria-hidden="true" /> Portfolio
+					<BriefcaseBusiness aria-hidden="true" size={18} /> Portfolio
 				</button>
 				<button
 					type="button"
-					className="button button-secondary"
+					className="button button-outline"
 					onClick={onStartNextBasket}
 				>
 					New basket
@@ -423,6 +481,52 @@ function kindCopy(event: BasketActivityEvent) {
 	}
 }
 
+function groupByDay(events: BasketActivityEvent[]) {
+	const groups: Array<{ key: string; label: string; events: BasketActivityEvent[] }> =
+		[];
+	const index = new Map<string, number>();
+	for (const event of events) {
+		const key = dayKey(event.at);
+		const existing = index.get(key);
+		if (existing === undefined) {
+			index.set(key, groups.length);
+			groups.push({ key, label: dayLabel(event.at), events: [event] });
+		} else {
+			groups[existing]?.events.push(event);
+		}
+	}
+	return groups;
+}
+
+function dayKey(iso: string) {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return iso;
+	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(iso: string) {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "Unknown";
+	const today = new Date();
+	const yesterday = new Date();
+	yesterday.setDate(today.getDate() - 1);
+	if (sameDay(d, today)) return "Today";
+	if (sameDay(d, yesterday)) return "Yesterday";
+	return new Intl.DateTimeFormat("en-US", {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+	}).format(d);
+}
+
+function sameDay(a: Date, b: Date) {
+	return (
+		a.getFullYear() === b.getFullYear() &&
+		a.getMonth() === b.getMonth() &&
+		a.getDate() === b.getDate()
+	);
+}
+
 function symbolsFromMeta(meta: Record<string, unknown>): string[] {
 	const raw = meta.symbols;
 	if (!Array.isArray(raw)) return [];
@@ -430,7 +534,13 @@ function symbolsFromMeta(meta: Record<string, unknown>): string[] {
 }
 
 function shortHash(hash: string) {
-	return `${hash.slice(0, 8)}…${hash.slice(-6)}`;
+	return `${hash.slice(0, 6)}…${hash.slice(-4)}`;
+}
+
+function trimShares(shares: string) {
+	const n = Number(shares);
+	if (!Number.isFinite(n)) return shares;
+	return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
 
 function formatUsd(n: number) {
@@ -446,6 +556,32 @@ function formatWhen(iso: string) {
 		return new Intl.DateTimeFormat("en-US", {
 			month: "short",
 			day: "numeric",
+			hour: "numeric",
+			minute: "2-digit",
+		}).format(new Date(iso));
+	} catch {
+		return iso;
+	}
+}
+
+function formatClock(iso: string) {
+	try {
+		return new Intl.DateTimeFormat("en-US", {
+			hour: "numeric",
+			minute: "2-digit",
+		}).format(new Date(iso));
+	} catch {
+		return "";
+	}
+}
+
+function formatFullWhen(iso: string) {
+	try {
+		return new Intl.DateTimeFormat("en-US", {
+			weekday: "short",
+			month: "short",
+			day: "numeric",
+			year: "numeric",
 			hour: "numeric",
 			minute: "2-digit",
 		}).format(new Date(iso));
