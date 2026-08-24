@@ -2,6 +2,19 @@
 
 swyft.fun is a non-custodial, fixed-budget swipe allocation app on **Stellar**. Set a spending limit, swipe RWAs into a basket, deposit DEMOUSD/USDC on testnet, and hold share tokens backed by that basket. A keeper rebalances toward target weights using DIA-compatible prices.
 
+## Architecture
+
+![swyft.fun architecture — client, backend, Soroban contracts, Stellar network](./docs/assets/architecture.png)
+
+| Layer | What it is here |
+|---|---|
+| **Client** | React swipe UI builds the basket; Freighter signs every transaction |
+| **Backend** | Portfolio / basket API + indexer for balances and price history (`../server`) |
+| **Soroban** | Plan/budget in vault buckets, executor for deposits & swaps; rebalance toward targets |
+| **Stellar** | Cross-contract calls to pools / DEX, DIA-compatible price oracle, anchors for fiat rails |
+
+Purple = off-chain. Teal / amber = on-chain. Dashed **Rebalance engine** = roadmap (vault `rebalance` already ships for keepers).
+
 ## Quick start
 
 ```bash

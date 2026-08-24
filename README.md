@@ -15,6 +15,21 @@ Set a budget, swipe assets into a basket, deposit stablecoin on testnet via Frei
 
 ---
 
+## Architecture
+
+![swyft.fun architecture — client, backend, Soroban contracts, Stellar network](./swyft/docs/assets/architecture.png)
+
+| Layer | In this monorepo |
+|---|---|
+| **Client** | `swyft/` React UI (swipe / basket) + Freighter signs every tx |
+| **Backend** | `server/` portfolio API (baskets, activity, PnL cache) |
+| **Soroban** | `bucket-vault`, `share-token`, `dia-oracle` via Soroban RPC |
+| **Stellar** | Testnet DEX / pools, DIA-fed oracle, anchors for fiat on/off-ramp |
+
+Dashed **Rebalance engine** in the diagram is product roadmap; vault `rebalance` already exists on-chain for target-weight keepers.
+
+---
+
 ## Features
 
 - **Swipe-to-basket** allocation with fixed ticket size and period limits
