@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://swyft.fun/sitemap.xml
+Sitemap: https://swyft-dot-fun.vercel.app/sitemap.xml

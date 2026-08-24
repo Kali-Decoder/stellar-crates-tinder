@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://swyft.fun/</loc>
+    <loc>https://swyft-dot-fun.vercel.app/</loc>
     <changefreq>weekly</changefreq>
     <priority>1</priority>
   </url>
   <url>
-    <loc>https://swyft.fun/docs</loc>
+    <loc>https://swyft-dot-fun.vercel.app/docs</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
