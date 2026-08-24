@@ -826,6 +826,10 @@ button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px
 .asset-pick-page .asset-pick-workspace {
   overflow: auto;
   overscroll-behavior: contain;
+  padding-top: 32px;
+}
+.asset-pick-page .page-heading {
+  margin-bottom: 18px;
 }
 .asset-pick-toolbar {
   display: flex;
@@ -5203,6 +5207,12 @@ html[data-chain="solana"] .button-top-up:hover:not(:disabled) { color: var(--acc
     overflow: hidden;
     border: 0;
     padding: 14px 15px calc(72px + env(safe-area-inset-bottom));
+  }
+  .asset-pick-page .asset-pick-workspace {
+    padding-top: 24px;
+  }
+  .asset-pick-page .page-heading {
+    margin-bottom: 14px;
   }
   .page-heading h1 { font-size: 28px; }
   .page-heading p { font-size: 13px; line-height: 1.45; }

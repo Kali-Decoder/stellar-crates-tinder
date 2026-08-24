@@ -492,7 +492,7 @@ function MockAppRoutes() {
 											charts, no swipe.
 										</p>
 									</header>
-									<div className="asset-pick-toolbar mt-3">
+									<div className="asset-pick-toolbar">
 										<span>
 											{selected.length} selected ·{" "}
 											{formatTicketSizeUsd(selectedTotalUsd)} {stableToken}
