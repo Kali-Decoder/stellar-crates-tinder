@@ -50,12 +50,13 @@ async function main() {
 
 	mountStellarPortfolioRoutes(app);
 
-	app.listen(port, () => {
+	app.listen(port, "0.0.0.0", () => {
 		console.log(
 			JSON.stringify({
 				event: "stellar_portfolio_started",
 				port,
 				mongo: Boolean(uri),
+				publicOrigin: origin,
 			}),
 		);
 	});

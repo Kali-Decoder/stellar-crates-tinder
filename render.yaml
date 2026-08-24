@@ -1,0 +1,35 @@
+# Render Blueprint — Stellar portfolio API + DEMOUSD faucet
+# https://render.com/docs/blueprint-spec
+#
+# Dashboard alternative: New → Web Service → root directory `server`
+#   Build: npm ci
+#   Start: npm start
+
+services:
+  - type: web
+    name: swyft-stellar-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/stellar/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_ORIGIN
+        sync: false # e.g. https://your-app.vercel.app
+      - key: MONGODB_URI
+        sync: false # optional; omit → in-memory (lost on restart)
+      - key: FAUCET_ISSUER_SECRET
+        sync: false # S… key for GAK7… DEMOUSD issuer (required for faucet)
+      - key: STELLAR_USDC_CONTRACT
+        value: CDLPZ6OAYSNO4LNXKL3GCLG57KTOQRBXWEE775XO3CUC4Y7GOBV2CRAA
+      - key: STELLAR_USDC_ISSUER
+        value: GAK7PGZIGH2ASZY6LF762ACROPQGBF7X4ZNUMPIMMOEP5ZFTGWTSA4TY
+      - key: STELLAR_RPC_URL
+        value: https://soroban-testnet.stellar.org
+      - key: STELLAR_NETWORK_PASSPHRASE
+        value: Test SDF Network ; September 2015
