@@ -125,7 +125,7 @@ export function ActivityScreen({
 		return (
 			<main className="receipt-page activity-page">
 				<div className="activity-feed-loading page-loader" role="status" aria-live="polite">
-					<span aria-hidden="true" />
+					<span className="loader-ring" aria-hidden="true" />
 					Loading history…
 				</div>
 			</main>

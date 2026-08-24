@@ -126,8 +126,8 @@ export function MockPositions({
 		return (
 			<main className="positions-page">
 				<div className="positions-loading page-loader" role="status" aria-live="polite">
-					<LoaderCircle />
-					<span>Loading baskets…</span>
+					<LoaderCircle aria-hidden="true" />
+					<p>Loading baskets…</p>
 				</div>
 			</main>
 		);
@@ -163,8 +163,8 @@ export function MockPositions({
 
 			{loading ? (
 				<div className="positions-loading page-loader" role="status" aria-live="polite">
-					<LoaderCircle />
-					<span>Loading baskets…</span>
+					<LoaderCircle aria-hidden="true" />
+					<p>Loading baskets…</p>
 				</div>
 			) : null}
 

@@ -2600,14 +2600,29 @@ main.loading-state,
 .feed-complete { position: relative; overflow: hidden; isolation: isolate; }
 .feed-complete > :not(.completion-confetti) { position: relative; z-index: 1; }
 .completion-confetti { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
-.loading-state > span,
-.page-loader > span {
+.loading-state > .loader-ring,
+.page-loader > .loader-ring,
+span.loader-ring {
+  display: block;
   width: 58px;
   height: 58px;
+  flex: 0 0 auto;
   border: 4px solid var(--line);
   border-top-color: var(--acid-dark);
   border-radius: 50%;
   animation: spin .8s linear infinite;
+}
+.positions-loading > span:not(.loader-ring),
+.activity-feed-loading > span:not(.loader-ring) {
+  /* label text — never inherit the old page-loader > span spin rule */
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  animation: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
 }
 .feed-loader { position: relative; width: 72px; height: 72px; display: grid; place-items: center; }
 .feed-loader::before { content: ""; position: absolute; inset: 0; border: 4px solid var(--line); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -4186,6 +4201,12 @@ html[data-chain="stellar"] .onboarding-chain-selector button.active {
   height: 28px;
   flex: 0 0 auto;
   animation: spin .8s linear infinite;
+}
+.positions-loading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .basket-card {

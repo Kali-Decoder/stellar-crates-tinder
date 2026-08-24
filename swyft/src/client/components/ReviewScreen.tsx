@@ -519,7 +519,7 @@ export function ReviewScreen({
 				aria-live="polite"
 				aria-busy="true"
 			>
-				<span />
+				<span className="loader-ring" />
 				<h1>Preparing your basket…</h1>
 			</main>
 		);

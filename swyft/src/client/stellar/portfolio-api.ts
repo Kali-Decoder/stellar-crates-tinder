@@ -95,6 +95,7 @@ export type WalletPortfolioPayload = {
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	const response = await fetch(apiUrl(path), {
 		...init,
+		signal: init?.signal ?? AbortSignal.timeout(20_000),
 		headers: {
 			"Content-Type": "application/json",
 			...(init?.headers ?? {}),
