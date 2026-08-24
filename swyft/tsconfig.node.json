@@ -9,8 +9,9 @@
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node", "vitest/globals"],
+    "resolveJsonModule": true,
+    "types": ["node"],
     "noEmit": true
   },
-  "include": ["src/domain", "tests", "scripts/**/*.ts", "vite.config.ts"]
+  "include": ["vite.config.ts"]
 }

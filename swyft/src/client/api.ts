@@ -9,7 +9,7 @@ import type {
 	Quote,
 } from "../domain/schemas.js";
 import { ticketSizeToBaseUnits } from "../domain/schemas.js";
-import { apiUrl } from "./api-base";
+import { apiUrl } from "./api-base.js";
 
 export interface WeeklySession {
 	id: string;

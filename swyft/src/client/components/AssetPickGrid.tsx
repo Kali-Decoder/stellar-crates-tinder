@@ -47,7 +47,7 @@ function categoryForCandidate(candidate: Candidate): RwaAssetType | "Other" {
 	const fromCatalog = lookupRwaAsset(candidate.symbol)?.type;
 	if (fromCatalog) return fromCatalog;
 
-	const tags = new Set(candidate.tags.map((tag) => tag.toLowerCase()));
+	const tags = new Set((candidate.tags ?? []).map((tag) => tag.toLowerCase()));
 	if (tags.has("stock") || tags.has("stocks")) return "Stock";
 	if (tags.has("etf") || tags.has("etfs")) return "ETF";
 	if (tags.has("commodity") || tags.has("commodities")) return "Commodity";
@@ -65,9 +65,10 @@ function metaForCandidate(candidate: Candidate): {
 } {
 	const category = categoryForCandidate(candidate);
 	const type = category === "Other" ? undefined : category;
+	const candidateTags = candidate.tags ?? [];
 	const displayTags = [
 		...(type ? [CATEGORY_LABEL[type]] : []),
-		...candidate.tags.filter(
+		...candidateTags.filter(
 			(tag) =>
 				![
 					"stellar",

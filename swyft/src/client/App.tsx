@@ -496,7 +496,7 @@ export function App({ config }: { config: PublicConfig }) {
 	const applyWalletPreferences = useCallback(
 		async (
 			chain: "ROBINHOOD" | "SOLANA",
-			solanaWallet?: ConnectedStandardSolanaWallet,
+			solanaWallet?: { address: string },
 		) => {
 			if (!preferences) return;
 			if (chain === "SOLANA" && !solanaWallet) {

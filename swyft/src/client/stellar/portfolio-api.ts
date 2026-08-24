@@ -1,7 +1,7 @@
 import { stellarConfig } from "./config";
 import { fetchDiaSpot } from "./dia-api";
 import type { VaultAllocation } from "./vault";
-import { apiUrl } from "../api-base";
+import { apiUrl } from "../api-base.js";
 
 export type StellarBasketRecord = {
 	id: string;
@@ -104,12 +104,13 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
 		error?: unknown;
 	};
 	if (!response.ok) {
+		const payload = body as unknown as { detail?: unknown; error?: unknown };
 		const detail =
-			typeof (body as { detail?: unknown }).detail === "string"
-				? String((body as { detail: string }).detail)
-				: "";
+			typeof payload.detail === "string" ? payload.detail : "";
 		const message =
-			typeof body.error === "string" ? body.error : `Portfolio API ${response.status}`;
+			typeof payload.error === "string"
+				? payload.error
+				: `Portfolio API ${response.status}`;
 		throw new Error(detail ? `${message}: ${detail.slice(0, 280)}` : message);
 	}
 	return body;

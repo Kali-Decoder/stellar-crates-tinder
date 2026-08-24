@@ -142,7 +142,7 @@ export async function readWalletBalances(owner: string): Promise<{
 }
 
 function parseStellarAmount(value: string, decimals: number): bigint {
-	const [wholeRaw, fracRaw = ""] = value.split(".");
+	const [wholeRaw = "0", fracRaw = ""] = value.split(".");
 	const whole = wholeRaw.replace(/^0+(?=\d)/, "") || "0";
 	const frac = `${fracRaw}${"0".repeat(decimals)}`.slice(0, decimals);
 	return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(frac || "0");

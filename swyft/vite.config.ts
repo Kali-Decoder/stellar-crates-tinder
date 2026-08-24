@@ -2,12 +2,48 @@ import { defineConfig } from "vite";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 
+const liveUi = process.env.VITE_LIVE_UI === "true";
+const privyStub = path.resolve(__dirname, "src/client/stubs/privy-stub.tsx");
+const permissionlessStub = path.resolve(
+  __dirname,
+  "src/client/stubs/permissionless-stub.ts",
+);
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src")
-    }
+      "@": path.resolve(__dirname, "./src"),
+      // Default production build is mock-only — stub Privy / optional peers so
+      // the Stellar Freighter UI can ship without live-stack dependencies.
+      ...(liveUi
+        ? {}
+        : {
+            "@privy-io/react-auth/smart-wallets": privyStub,
+            "@privy-io/react-auth/solana": privyStub,
+            "@privy-io/react-auth/ui": privyStub,
+            "@privy-io/react-auth": privyStub,
+            permissionless: permissionlessStub,
+            "permissionless/accounts": permissionlessStub,
+            "@solana-program/memo": permissionlessStub,
+            [path.resolve(__dirname, "src/client/App.tsx")]: path.resolve(
+              __dirname,
+              "src/client/App.stub.tsx",
+            ),
+            [path.resolve(__dirname, "src/client/LiveRoot.tsx")]: path.resolve(
+              __dirname,
+              "src/client/LiveRoot.stub.tsx",
+            ),
+            [path.resolve(__dirname, "src/client/components/WalletMenu.tsx")]:
+              path.resolve(__dirname, "src/client/components/live-only.stub.tsx"),
+            [path.resolve(__dirname, "src/client/components/PositionsScreen.tsx")]:
+              path.resolve(__dirname, "src/client/components/live-only.stub.tsx"),
+            [path.resolve(__dirname, "src/client/components/ReviewScreen.tsx")]:
+              path.resolve(__dirname, "src/client/components/live-only.stub.tsx"),
+            [path.resolve(__dirname, "src/client/components/Onboarding.tsx")]:
+              path.resolve(__dirname, "src/client/components/live-only.stub.tsx"),
+          }),
+    },
   },
   root: ".",
   server: {
@@ -19,7 +55,7 @@ export default defineConfig({
         target: "https://api.diadata.org",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/dia-api/, ""),
-        secure: true
+        secure: true,
       },
       // Market history path (DIA RWA REST is spot-only; series anchored to DIA).
       // Yahoo is flaky from some networks — return 503 JSON so the client can
@@ -50,10 +86,10 @@ export default defineConfig({
           });
         },
       },
-    }
+    },
   },
   build: {
     outDir: "dist/client",
-    sourcemap: false
-  }
+    sourcemap: false,
+  },
 });

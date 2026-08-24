@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from "react";
+import { StrictMode, lazy, Suspense, type ComponentType } from "react";
 import { preload } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
@@ -25,13 +25,20 @@ preload(instrumentSerifRegularUrl, {
 	type: "font/woff2",
 });
 
-/** Privy / Solana live stack — not loaded on the default Stellar mock path. */
-const LiveRoot = lazy(() =>
-	import("./LiveRoot").then((mod) => ({ default: mod.LiveRoot })),
-);
+/**
+ * Live Privy stack is only bundled when VITE_LIVE_UI=true.
+ * Default production builds (VITE_MOCK_UI=true) stay mock-only and avoid
+ * optional Privy peer deps that break `vite build`.
+ */
+const LiveRoot: ComponentType | null =
+	import.meta.env.VITE_LIVE_UI === "true"
+		? lazy(() =>
+				import("./LiveRoot").then((mod) => ({ default: mod.LiveRoot })),
+			)
+		: null;
 
 function Root() {
-	if (isMockUi()) return <MockApp />;
+	if (isMockUi() || !LiveRoot) return <MockApp />;
 	return (
 		<Suspense
 			fallback={

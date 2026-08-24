@@ -27,6 +27,7 @@ import {
 	installApiOverride,
 } from "../api";
 import { AppShell } from "../components/AppShell";
+import { AssetCountLoader } from "../components/AssetCountLoader";
 import { AssetIconProvider } from "../components/AssetMark";
 import { AssetPickGrid } from "../components/AssetPickGrid";
 import { BudgetRail } from "../components/BudgetRail";
@@ -473,13 +474,10 @@ function MockAppRoutes() {
 									</button>
 								</div>
 							) : sessionBusy || !feed ? (
-								<div className="loading-state page-loader">
-									<div className="feed-loader" role="img" aria-label="Mock">
-										<b>UI</b>
-									</div>
-									<h2>Building your Swyft feed</h2>
-									<p>Eligible RWAs and crypto on Stellar. You stay in control.</p>
-								</div>
+								<AssetCountLoader
+									title="Building your Swyft feed"
+									subtitle="Eligible RWAs on Stellar. You stay in control."
+								/>
 							) : (
 								<>
 									<header className="page-heading">

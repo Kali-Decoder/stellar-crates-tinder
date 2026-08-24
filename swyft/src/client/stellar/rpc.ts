@@ -113,7 +113,10 @@ function formatTxFailure(tx: Awaited<ReturnType<typeof waitForTx>>): string {
 	const hints: string[] = [];
 	for (const raw of events) {
 		try {
-			const diagnostic = xdr.DiagnosticEvent.fromXDR(raw, "base64");
+			const diagnostic =
+				typeof raw === "string"
+					? xdr.DiagnosticEvent.fromXDR(raw, "base64")
+					: (raw as xdr.DiagnosticEvent);
 			if (diagnostic.inSuccessfulContractCall()) continue;
 			const body = diagnostic.event().body().value();
 			const topics = body.topics();

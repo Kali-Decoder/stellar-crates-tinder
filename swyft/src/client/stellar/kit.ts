@@ -39,7 +39,10 @@ function ensureKitDomSupport() {
 		document.head.appendChild(style);
 	}
 	for (const [key, value] of Object.entries(swyftSwkTheme)) {
-		document.documentElement.style.setProperty(`--swk-${key}`, value);
+		document.documentElement.style.setProperty(
+			`--swk-${key}`,
+			String(value ?? ""),
+		);
 	}
 }
 

@@ -128,11 +128,7 @@ export function MockAccount({
 	}, [handle]);
 
 	const riskLabel =
-		preferences.riskMode === "conservative"
-			? "Conservative"
-			: preferences.riskMode === "aggressive"
-				? "Aggressive"
-				: "Balanced";
+		preferences.riskMode === "degen" ? "Degen" : "Balanced";
 
 	const joinedLabel = user?.createdAt
 		? `Joined ${joinedFmt.format(new Date(user.createdAt))}`
