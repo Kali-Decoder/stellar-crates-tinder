@@ -19,6 +19,8 @@ import type {
 	TokenBalanceResponse,
 	WeeklySession,
 } from "../api";
+import { stellarConfig, stellarCanonicalSymbol } from "../stellar/config";
+import { lookupRwaAsset } from "../stellar/dia-api";
 import { MOCK_WALLET } from "./enabled";
 
 const OUTPUTS: Record<string, string> = {
@@ -202,12 +204,22 @@ export function buildMockCandidates(
 	limit = FEED_PAGE_SIZE,
 ): Candidate[] {
 	const excluded = new Set(excludedAssetIds);
-	const includeCommunity = preferences.riskMode === "degen";
-	const allowed = new Set(preferences.assetClasses);
 	const amount = BigInt(amountInBaseUnits);
 	const now = Date.now();
 	const expiresAt = new Date(now + 60_000).toISOString();
 	const quotedAt = new Date(now).toISOString();
+
+	const stellarUniverse = buildStellarVaultUniverse();
+	if (stellarUniverse.length) {
+		return stellarUniverse
+			.filter((asset) => !excluded.has(asset.assetId))
+			.map((asset) =>
+				toCandidate(asset, preferences, amountInBaseUnits, amount, now, quotedAt, expiresAt),
+			);
+	}
+
+	const includeCommunity = preferences.riskMode === "degen";
+	const allowed = new Set(preferences.assetClasses);
 
 	return fixtureAssets(includeCommunity)
 		.filter(
@@ -222,56 +234,148 @@ export function buildMockCandidates(
 			if (!baseEstimate || !meta) {
 				throw new Error(`MOCK_FIXTURE_MISSING_${asset.symbol}`);
 			}
-			const estimated = (
-				(BigInt(baseEstimate) * amount) /
-				DEFAULT_SLOT_BUDGET
-			).toString();
-			const minimum = ((BigInt(estimated) * 995n) / 1000n).toString();
-			return {
-				chain: "ROBINHOOD" as const,
-				assetId: asset.assetId,
-				symbol: asset.symbol,
-				name: asset.name,
-				kind: asset.kind,
-				contract: asset.address,
-				decimals: asset.decimals,
-				eligible: true,
-				marketHealthy: true,
-				permissionAllowed: true,
-				marketPriceUsd: meta.priceUsd,
-				marketDataSource: "demo" as const,
-				marketDataUpdatedAt: new Date(now).toISOString(),
-				primaryClassification:
-					asset.kind === "STOCK_TOKEN"
-						? ("TOKENIZED_STOCK" as const)
-						: ("CRYPTO" as const),
-				classificationConfidence: "HIGH" as const,
-				tags: [asset.kind === "STOCK_TOKEN" ? "stock" : "crypto"],
-				riskFlags: [] as string[],
-				classificationEvidence: [`mock:registry:${asset.symbol}`],
-				crowdScoreBps: meta.crowdScoreBps,
-				reason: meta.reason,
-				evidenceIds: [`mock:${asset.symbol}:price`, `mock:${asset.symbol}:route`],
-				quote: {
-					requestId: `mock-quote-${asset.symbol}-${now}`,
-					provider: preferences.executionProvider,
-					chain: "ROBINHOOD" as const,
+			return toCandidate(
+				{
 					assetId: asset.assetId,
-					tokenOut: asset.address,
-					amountInBaseUnits,
-					estimatedAmountOut: estimated,
-					minimumAmountOut: minimum,
-					unitPriceUsd: String(meta.priceUsd),
+					symbol: asset.symbol,
+					name: asset.name,
+					kind: asset.kind,
+					contract: asset.address,
+					decimals: asset.decimals,
+					priceUsd: meta.priceUsd,
 					priceImpactBps: meta.priceImpactBps,
-					routing:
-						preferences.executionProvider === "ZERO_EX"
-							? ("ZERO_EX" as const)
-							: ("CLASSIC" as const),
-					quotedAt,
-					expiresAt,
+					crowdScoreBps: meta.crowdScoreBps,
+					reason: meta.reason,
+					baseEstimate,
 				},
-			};
+				preferences,
+				amountInBaseUnits,
+				amount,
+				now,
+				quotedAt,
+				expiresAt,
+			);
 		});
+}
+
+type UniverseAsset = {
+	assetId: string;
+	symbol: string;
+	name: string;
+	kind: "CRYPTO" | "STOCK_TOKEN";
+	contract: string;
+	decimals: number;
+	priceUsd: number;
+	priceImpactBps: number;
+	crowdScoreBps: number;
+	reason: string;
+	baseEstimate: string;
+	category?: "Stock" | "ETF" | "Commodity" | "FX";
+};
+
+/** Every token in the deployed Stellar vault — full pick-grid universe. */
+function buildStellarVaultUniverse(): UniverseAsset[] {
+	const prices = stellarConfig.prices ?? {};
+	const symbols = Object.keys(stellarConfig.tokens).sort((a, b) => {
+		const order = ["Stock", "ETF", "Commodity", "FX"];
+		const ta = lookupRwaAsset(a)?.type ?? "Stock";
+		const tb = lookupRwaAsset(b)?.type ?? "Stock";
+		const oa = order.indexOf(ta);
+		const ob = order.indexOf(tb);
+		if (oa !== ob) return oa - ob;
+		return a.localeCompare(b);
+	});
+
+	return symbols.map((rawSymbol, index) => {
+		const symbol = stellarCanonicalSymbol(rawSymbol);
+		const catalog = lookupRwaAsset(symbol);
+		const contract = stellarConfig.tokens[rawSymbol] ?? stellarConfig.tokens[symbol] ?? "";
+		const priceUsd =
+			prices[rawSymbol] ?? prices[symbol] ?? META[symbol]?.priceUsd ?? META[rawSymbol]?.priceUsd ?? 100;
+		const fixture = META[symbol] ?? META[rawSymbol];
+		const category = catalog?.type ?? "Stock";
+		return {
+			assetId: `stellar:testnet:${symbol}`,
+			symbol: symbol === "GOOG" ? "GOOGL" : symbol,
+			name: catalog?.name ?? `${symbol} tokenized RWA`,
+			kind: "STOCK_TOKEN" as const,
+			contract,
+			decimals: 8,
+			priceUsd,
+			priceImpactBps: fixture?.priceImpactBps ?? 25,
+			crowdScoreBps: fixture?.crowdScoreBps ?? Math.max(1_200, 7_500 - index * 40),
+			reason:
+				fixture?.reason ??
+				`Live DIA-marked ${category} on the Stellar vault.`,
+			baseEstimate: OUTPUTS[symbol] ?? OUTPUTS[rawSymbol] ?? DEFAULT_SLOT_BUDGET.toString(),
+			category,
+		};
+	});
+}
+
+function toCandidate(
+	asset: UniverseAsset,
+	preferences: OnboardingPreferences,
+	amountInBaseUnits: string,
+	amount: bigint,
+	now: number,
+	quotedAt: string,
+	expiresAt: string,
+): Candidate {
+	const estimated = (
+		(BigInt(asset.baseEstimate) * amount) /
+		DEFAULT_SLOT_BUDGET
+	).toString();
+	const minimum = ((BigInt(estimated) * 995n) / 1000n).toString();
+	const category =
+		asset.category ??
+		lookupRwaAsset(asset.symbol)?.type ??
+		(asset.kind === "CRYPTO" ? undefined : "Stock");
+	const categoryTag = (category ?? (asset.kind === "CRYPTO" ? "crypto" : "stock")).toLowerCase();
+	return {
+		chain: "ROBINHOOD" as const,
+		assetId: asset.assetId,
+		symbol: asset.symbol,
+		name: asset.name,
+		kind: asset.kind,
+		contract: asset.contract,
+		decimals: asset.decimals,
+		eligible: true,
+		marketHealthy: true,
+		permissionAllowed: true,
+		marketPriceUsd: asset.priceUsd,
+		marketDataSource: "demo" as const,
+		marketDataUpdatedAt: new Date(now).toISOString(),
+		primaryClassification:
+			asset.kind === "CRYPTO"
+				? ("CRYPTO" as const)
+				: ("TOKENIZED_STOCK" as const),
+		classificationConfidence: "HIGH" as const,
+		tags: [categoryTag, "stellar", ...(category ? (["rwa"] as const) : [])],
+		riskFlags: [] as string[],
+		classificationEvidence: [`stellar:vault:${asset.symbol}`],
+		crowdScoreBps: asset.crowdScoreBps,
+		reason: asset.reason,
+		evidenceIds: [`stellar:${asset.symbol}:price`, `stellar:${asset.symbol}:vault`],
+		quote: {
+			requestId: `mock-quote-${asset.symbol}-${now}`,
+			provider: preferences.executionProvider,
+			chain: "ROBINHOOD" as const,
+			assetId: asset.assetId,
+			tokenOut: asset.contract,
+			amountInBaseUnits,
+			estimatedAmountOut: estimated,
+			minimumAmountOut: minimum,
+			unitPriceUsd: String(asset.priceUsd),
+			priceImpactBps: asset.priceImpactBps,
+			routing:
+				preferences.executionProvider === "ZERO_EX"
+					? ("ZERO_EX" as const)
+					: ("CLASSIC" as const),
+			quotedAt,
+			expiresAt,
+		},
+	};
 }
 
 export function buildMockFeed(
@@ -280,7 +384,12 @@ export function buildMockFeed(
 	excludedAssetIds: string[] = [],
 ): FeedResponse {
 	const amount = ticketSizeToBaseUnits(preferences.ticketSizeUsd).toString();
-	const candidates = buildMockCandidates(preferences, amount, excludedAssetIds);
+	const candidates = buildMockCandidates(
+		preferences,
+		amount,
+		excludedAssetIds,
+		Number.POSITIVE_INFINITY,
+	);
 	const inputCommitment = commitment(
 		`${session.id}:${preferences.ticketSizeUsd}:${excludedAssetIds.join(",")}`,
 	);
@@ -289,7 +398,7 @@ export function buildMockFeed(
 	);
 	return {
 		candidates,
-		hasMore: candidates.length >= FEED_PAGE_SIZE,
+		hasMore: false,
 		rankedAssetCount: candidates.length,
 		feed: {
 			schemaVersion: "investmade-feed-output/v1",
@@ -302,7 +411,7 @@ export function buildMockFeed(
 				action: "BUY" as const,
 				rank: index + 1,
 				amountInBaseUnits: amount,
-				scoreBps: Math.max(1_000, 8_000 - index * 180),
+				scoreBps: Math.max(1_000, 8_000 - index * 40),
 				evidenceIds: candidate.evidenceIds,
 				reason: candidate.reason,
 			})),
@@ -317,7 +426,7 @@ export function buildMockFeed(
 			outputCommitment,
 			requestedProvider: preferences.feedRankingProvider,
 			effectiveProvider: "DETERMINISTIC",
-			warnings: ["Mock UI · ranking is local fixture data."],
+			warnings: ["Mock UI · full Stellar vault universe."],
 		},
 	};
 }

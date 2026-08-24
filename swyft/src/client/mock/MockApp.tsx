@@ -1,4 +1,4 @@
-import { Bot, ShoppingBasket } from "lucide-react";
+import { ShoppingBasket } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	BrowserRouter,
@@ -11,7 +11,6 @@ import {
 import {
 	fillFeedPage,
 	nextFeedExcludedAssetIds,
-	shouldPrefetchNextFeed,
 } from "../../domain/feed-pagination";
 import {
 	type AppChain,
@@ -29,12 +28,11 @@ import {
 } from "../api";
 import { AppShell } from "../components/AppShell";
 import { AssetIconProvider } from "../components/AssetMark";
+import { AssetPickGrid } from "../components/AssetPickGrid";
 import { BudgetRail } from "../components/BudgetRail";
-import { Confetti } from "../components/magicui/confetti";
 import { LicenseGate } from "../components/LicenseModal";
 import { ActivityScreen } from "../components/ActivityScreen";
 import { DocsScreen } from "../components/DocsScreen";
-import { SwipeCard } from "../components/SwipeCard";
 import {
 	type AppPage,
 	APP_PATHS,
@@ -63,8 +61,6 @@ const TWITTER_HANDLE = "swyftdotfun";
 const TWITTER_URL = `https://x.com/${TWITTER_HANDLE}`;
 
 installApiOverride(createMockApi() as typeof api);
-
-type DecisionFeedback = "invest" | "skip";
 
 const AUTHED_PAGES = new Set<AppPage>([
 	"onboarding",
@@ -103,33 +99,21 @@ function MockAppRoutes() {
 	const [preferences, setPreferences] = useState<OnboardingPreferences>();
 	const [index, setIndex] = useState(0);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const [assetInfoOpen, setAssetInfoOpen] = useState(false);
 	const [settlement, setSettlement] = useState<ExecutionRecord>(
 		() => DEMO_ACTIVITY.record,
 	);
 	const [error, setError] = useState("");
-	const [decisionFeedback, setDecisionFeedback] = useState<DecisionFeedback>();
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [feedExhausted, setFeedExhausted] = useState(false);
 	const [basketSheetOpen, setBasketSheetOpen] = useState(false);
 	const [isCompact, setIsCompact] = useState(false);
 	const [user, setUser] = useState<SwyftUser>();
 	const [sessionBusy, setSessionBusy] = useState(false);
-	const decisionTimer = useRef<number | undefined>(undefined);
 	const warningsByAssetId = useRef(new Map<string, string[]>());
 
 	const activeChain = preferences?.activeChain ?? onboardingChain;
 	const wallet = stellar.address;
 	const candidates = feed?.candidates ?? [];
-	const current = candidates[index];
-	const currentFeedCard = current
-		? feed?.feed.cards.find((card) => card.assetId === current.assetId)
-		: undefined;
-	const currentWarnings = current
-		? (warningsByAssetId.current.get(current.assetId) ??
-			feed?.feed.warnings ??
-			[])
-		: [];
 	const selected = selectedIds
 		.map((assetId) =>
 			candidates.find((candidate) => candidate.assetId === assetId),
@@ -139,7 +123,7 @@ function MockAppRoutes() {
 	const periodLimitUsd = preferences?.periodLimitUsd ?? 100;
 	const selectedTotalUsd = selected.length * ticketSizeUsd;
 	const stableToken = "USDC";
-	const canAddCurrent = selectedTotalUsd + ticketSizeUsd <= periodLimitUsd;
+	const canAddMore = selectedTotalUsd + ticketSizeUsd <= periodLimitUsd;
 
 	const goTo = useCallback(
 		(next: AppPage, options?: { replace?: boolean }) => {
@@ -182,7 +166,7 @@ function MockAppRoutes() {
 				setSession(opened);
 				setFeed({
 					...generated,
-					candidates: fillFeedPage(generated.candidates),
+					candidates: generated.candidates,
 				});
 				window.scrollTo({ top: 0, behavior: "auto" });
 			} catch (caught) {
@@ -197,13 +181,6 @@ function MockAppRoutes() {
 			}
 		},
 		[goTo],
-	);
-
-	useEffect(
-		() => () => {
-			if (decisionTimer.current) window.clearTimeout(decisionTimer.current);
-		},
-		[],
 	);
 
 	useEffect(() => {
@@ -285,79 +262,34 @@ function MockAppRoutes() {
 	}, [feed, feedExhausted, loadingMore, preferences, session]);
 
 	useEffect(() => {
-		if (
-			!feed?.hasMore ||
-			feedExhausted ||
-			loadingMore ||
-			!shouldPrefetchNextFeed(index, candidates.length)
-		) {
-			return;
-		}
+		if (!feed?.hasMore || feedExhausted || loadingMore) return;
+		if (candidates.length >= 48) return;
 		void loadMoreCandidates();
 	}, [
 		candidates.length,
 		feed,
 		feedExhausted,
-		index,
 		loadMoreCandidates,
 		loadingMore,
 	]);
-
-	function decide(add: boolean) {
-		if (!current) return;
-		if (add && !selectedIds.includes(current.assetId) && canAddCurrent) {
-			setSelectedIds((ids) => [...ids, current.assetId]);
-			if (isCompact) {
-				setBasketSheetOpen(false);
-			}
-		}
-		setIndex((value) => Math.min(value + 1, candidates.length));
-	}
 
 	function goReview() {
 		setBasketSheetOpen(false);
 		goTo("review");
 	}
 
-	function animateDecision(add: boolean) {
-		if (!current || decisionFeedback || (add && !canAddCurrent)) return;
+	function toggleAsset(assetId: string, nextSelected: boolean) {
 		unlockSwipeAudio();
-		playSwipeSound(add ? "add" : "skip");
-		setDecisionFeedback(add ? "invest" : "skip");
-		decisionTimer.current = window.setTimeout(() => {
-			decide(add);
-			setDecisionFeedback(undefined);
-			decisionTimer.current = undefined;
-		}, 300);
-	}
-
-	const animateDecisionRef = useRef(animateDecision);
-	animateDecisionRef.current = animateDecision;
-
-	useEffect(() => {
-		if (page !== "basket") return;
-		function onKeyDown(event: KeyboardEvent) {
-			const target = event.target as HTMLElement | null;
-			if (
-				target &&
-				(target.tagName === "INPUT" ||
-					target.tagName === "TEXTAREA" ||
-					target.isContentEditable)
-			) {
-				return;
-			}
-			if (event.key === "ArrowLeft") {
-				event.preventDefault();
-				animateDecisionRef.current(false);
-			}
-			if (event.key === "ArrowRight") {
-				event.preventDefault();
-				animateDecisionRef.current(true);
-			}
+		if (nextSelected) {
+			if (!canAddMore || selectedIds.includes(assetId)) return;
+			playSwipeSound("add");
+			setSelectedIds((ids) => [...ids, assetId]);
+			return;
 		}
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [page]);
+		playSwipeSound("skip");
+		setSelectedIds((ids) => ids.filter((id) => id !== assetId));
+		setFeedExhausted(false);
+	}
 
 	function remove(assetId: string) {
 		setSelectedIds((ids) => ids.filter((id) => id !== assetId));
@@ -525,12 +457,13 @@ function MockAppRoutes() {
 				) : page === "review" ? (
 					<Navigate to={APP_PATHS.basket} replace />
 				) : (
-					<main className="swipe-page">
-						<section className="swipe-workspace">
+					<main className="swipe-page asset-pick-page">
+						<section className="swipe-workspace asset-pick-workspace">
 							<header className="page-heading">
 								<h1>Build your basket</h1>
 								<p>
-									Swipe left to skip, right to add. No buttons — drag the card.
+									Tap cards to select or deselect. Scroll to browse — no charts,
+									no swipe.
 								</p>
 							</header>
 							{error ? (
@@ -554,24 +487,36 @@ function MockAppRoutes() {
 									<h2>Building your Swyft feed</h2>
 									<p>Eligible RWAs and crypto on Stellar. You stay in control.</p>
 								</div>
-							) : current ? (
+							) : (
 								<>
-									<div className="card-stage">
-										<SwipeCard
-											candidate={current}
-											reason={currentFeedCard?.reason ?? current.reason}
-											ticketSizeUsd={ticketSizeUsd}
-											stableToken={stableToken}
-											feedback={decisionFeedback}
-											infoOpen={assetInfoOpen}
-											onInfoOpenChange={setAssetInfoOpen}
-											onSwipe={animateDecision}
-											canAdd={canAddCurrent}
-										/>
+									<div className="asset-pick-toolbar mt-3">
+										<span>
+											{selected.length} selected ·{" "}
+											{formatTicketSizeUsd(selectedTotalUsd)} {stableToken}
+										</span>
+										<button
+											type="button"
+											className="button button-primary"
+											disabled={!selected.length}
+											onClick={goReview}
+										>
+											Review basket ({selected.length}) <ShoppingBasket />
+										</button>
 									</div>
+									<AssetPickGrid
+										candidates={candidates}
+										selectedIds={selectedIds}
+										ticketSizeUsd={ticketSizeUsd}
+										canAddMore={canAddMore}
+										onToggle={toggleAsset}
+									/>
+									{loadingMore ? (
+										<p className="asset-pick-loading">Loading more assets…</p>
+									) : null}
 									<footer className="swipe-session-footer">
 										<span>
-											{STELLAR_SUPPORTED_ASSET_COUNT} assets on Stellar
+											{candidates.length} shown · {STELLAR_SUPPORTED_ASSET_COUNT}{" "}
+											on Stellar vault
 										</span>
 										<a
 											href={TWITTER_URL}
@@ -581,52 +526,7 @@ function MockAppRoutes() {
 											@{TWITTER_HANDLE}
 										</a>
 									</footer>
-									{currentWarnings.length ? (
-										<aside className="ai-warnings" aria-label="Mock warnings">
-											<Bot aria-hidden="true" />
-											<ul>
-												{currentWarnings.map((warning) => (
-													<li key={warning}>{warning}</li>
-												))}
-											</ul>
-										</aside>
-									) : null}
 								</>
-							) : loadingMore ? (
-								<div className="loading-state loading-more">
-									<div className="feed-loader" role="img" aria-label="Mock">
-										<b>UI</b>
-									</div>
-									<h2>Finding more assets…</h2>
-								</div>
-							) : (
-								<div className="feed-complete">
-									{selected.length ? (
-										<Confetti
-											className="completion-confetti"
-											options={{
-												gravity: 0.9,
-												particleCount: 120,
-												spread: 90,
-												startVelocity: 36,
-											}}
-										/>
-									) : null}
-									<h2>That’s the feed.</h2>
-									<p>
-										{selected.length
-											? `${formatTicketSizeUsd(selected.length * ticketSizeUsd)} ${stableToken} is ready for review.`
-											: `You skipped every card. Your ${stableToken} stays put.`}
-									</p>
-									<button
-										type="button"
-										className="button button-primary"
-										disabled={!selected.length}
-										onClick={goReview}
-									>
-										Review basket ({selected.length}) <ShoppingBasket />
-									</button>
-								</div>
 							)}
 						</section>
 						<BudgetRail
